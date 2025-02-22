@@ -1,25 +1,19 @@
 from typing import Union
-
 import os
 import re
 import requests
 import time
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from loguru import logger
+import logging
 
 from models import CVRequest
+from transformers.linkedin import transform_linkedin_data
+logger = logging.getLogger("uvicorn")
 
-# Configure logger
-logger.add(
-    "logs/api.log",
-    rotation="500 MB",
-    retention="10 days",
-    level="INFO",
-    format="{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}",
-)
 
 load_dotenv()
 
@@ -100,8 +94,13 @@ def get_cv(request: CVRequest):
         payload = {"link": f"https://www.linkedin.com/in/{username}"}
 
         logger.debug(f"Making request to RapidAPI for user: {username}")
-
         response = requests.post(rapidapi_url, json=payload, headers=headers)
+
+        if response.status_code == 404:
+            logger.error(
+                f"RapidAPI request failed with status code: {response.status_code}"
+            )
+            return JSONResponse(content={"error": "User not found"}, status_code=404)
 
         if response.status_code != 200:
             logger.error(
@@ -113,14 +112,16 @@ def get_cv(request: CVRequest):
             )
 
         logger.info(f"Successfully retrieved CV data for user: {username}")
-        return response.json()
 
-    except requests.RequestException as req_err:
-        logger.exception(f"Request error while processing request: {str(req_err)}")
-        raise HTTPException(
-            status_code=500, detail="Internal server error: Request failed"
-        )
+        transformed_data = transform_linkedin_data(response_data)
+        
+        logger.debug(f"Returning transformed response data for user: {username}")
+        return JSONResponse(content=transformed_data)
+
+    except HTTPException as http_exc:
+        raise http_exc
 
     except Exception as e:
-        logger.exception(f"Unexpected error while processing request: {str(e)}")
+        logger.error(f"Failed to fetch data for user: {username}")
+        logger.error(str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
