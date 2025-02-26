@@ -10,8 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import logging
 
-from models import CVRequest
+from models import CVRequest, Profile
 from transformers.linkedin import transform_linkedin_data
+from database import Database
+
 logger = logging.getLogger("uvicorn")
 
 
@@ -19,6 +21,18 @@ load_dotenv()
 
 app = FastAPI()
 logger.info("FastAPI application started")
+
+@app.on_event("startup")
+async def startup_db_client():
+    await Database.connect()
+    logger.info("Connected to MongoDB")
+
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    await Database.disconnect()
+    logger.info("Disconnected from MongoDB")
+
 
 # Add CORS middleware
 app.add_middleware(
@@ -38,7 +52,7 @@ def read_root():
 
 
 @app.post("/profile-info")
-def get_cv(request: CVRequest):
+async def get_cv(request: CVRequest):
     logger.info(f"Processing CV request for URL: {request.link}")
 
     # Extract username from URL or use direct username
@@ -111,11 +125,19 @@ def get_cv(request: CVRequest):
                 detail="Failed to fetch data from RapidAPI",
             )
 
-        logger.info(f"Successfully retrieved CV data for user: {username}")
+        logger.debug(f"Successfully retrieved CV data for user: {username}")
 
         transformed_data = transform_linkedin_data(response_data)
-        
-        logger.debug(f"Returning transformed response data for user: {username}")
+
+        # Save to MongoDB
+        profile_data = Profile(linkedin_username=username, **transformed_data)
+        await db.profiles.update_one(
+            {"linkedin_username": username},
+            {"$set": profile_data.dict(by_alias=True)},
+            upsert=True,
+        )
+
+        logger.debug(f"Saved profile data to MongoDB for user: {username}")
         return JSONResponse(content=transformed_data)
 
     except HTTPException as http_exc:
