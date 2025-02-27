@@ -1,6 +1,12 @@
 """LinkedIn data transformation utilities."""
 
-from models import Position, Experience, Education, VolunteeringExperience, Profile
+from src.domain.entities.profile import (
+    Position,
+    Experience,
+    Education,
+    VolunteeringExperience,
+    Profile,
+)
 
 
 def extract_date_info(caption: str) -> tuple:
@@ -125,22 +131,22 @@ def format_volunteering(vol: dict) -> VolunteeringExperience:
     )
 
 
-def create_profile_from_linkedin_data(data: dict) -> Profile:
+def transform_profile_data(data: dict) -> dict:
     """Transform LinkedIn API response to match frontend types."""
     linkedin_data = data["data"]
 
-    return Profile(
-        username=linkedin_data["publicIdentifier"],
-        firstName=linkedin_data["firstName"],
-        lastName=linkedin_data["lastName"],
-        profilePictureUrl=linkedin_data["profilePic"],
-        jobTitle=linkedin_data["headline"],
-        headline=linkedin_data["headline"],
-        about=linkedin_data["about"],
-        experiences=[format_experience(exp) for exp in linkedin_data["experiences"]],
-        education=[format_education(edu) for edu in linkedin_data["educations"]],
-        skills=[skill["title"] for skill in linkedin_data["skills"]],
-        volunteering=[
+    return {
+        "username": linkedin_data["publicIdentifier"],
+        "firstName": linkedin_data["firstName"],
+        "lastName": linkedin_data["lastName"],
+        "profilePictureUrl": linkedin_data["profilePic"],
+        "jobTitle": linkedin_data["headline"],
+        "headline": linkedin_data["headline"],
+        "about": linkedin_data["about"],
+        "experiences": [format_experience(exp) for exp in linkedin_data["experiences"]],
+        "education": [format_education(edu) for edu in linkedin_data["educations"]],
+        "skills": [skill["title"] for skill in linkedin_data["skills"]],
+        "volunteering": [
             format_volunteering(vol) for vol in linkedin_data["volunteerAndAwards"]
         ],
-    )
+    }

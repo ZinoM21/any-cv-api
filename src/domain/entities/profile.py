@@ -1,12 +1,8 @@
 from beanie import Document, Indexed
+from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import List, Optional
 from uuid import UUID, uuid4
-
-
-class ProfileInfoRequest(BaseModel):
-    link: str
 
 
 class Position(BaseModel):

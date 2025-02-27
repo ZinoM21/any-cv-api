@@ -1,11 +1,9 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-import os
-from dotenv import load_dotenv
 from beanie import init_beanie
-from models import Profile
-from utils.logging_config import logger
 
-load_dotenv()
+from src.domain.entities.profile import Profile
+from src.config.environment import env
+from src.config.logger import logger
 
 
 class Database:
@@ -15,9 +13,8 @@ class Database:
     async def connect(cls):
         """Initialize database connection and Beanie"""
         try:
-            mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
             cls.client = AsyncIOMotorClient(
-                mongodb_url,
+                env.mongodb_url,
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=5000,
             )
