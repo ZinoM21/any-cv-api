@@ -3,6 +3,7 @@ import os
 import re
 import requests
 import time
+import json
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -10,8 +11,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import logging
 
-from models import CVRequest, Profile
-from transformers.linkedin import transform_linkedin_data
+from models import ProfileInfoRequest, Profile
+from transformers.linkedin import create_profile_from_linkedin_data
 from database import Database
 
 logger = logging.getLogger("uvicorn")
@@ -52,7 +53,7 @@ def read_root():
 
 
 @app.post("/profile-info")
-async def get_cv(request: CVRequest):
+async def get_cv(request: ProfileInfoRequest):
     logger.info(f"Processing CV request for URL: {request.link}")
 
     # Extract username from URL or use direct username
@@ -81,6 +82,12 @@ async def get_cv(request: CVRequest):
             raise HTTPException(status_code=400, detail="Invalid username format")
 
     logger.debug(f"Extracted username: {username}")
+
+    # Check if profile already exists in DB
+    profile = await Profile.find_one(Profile.username == username)
+    if profile:
+        logger.debug(f"Profile data found in MongoDB for user: {username}")
+        return JSONResponse(content=json.loads(profile.json(exclude={"id": True})))
 
     try:
         # Fetch data from RapidAPI
@@ -127,18 +134,14 @@ async def get_cv(request: CVRequest):
 
         logger.debug(f"Successfully retrieved CV data for user: {username}")
 
-        transformed_data = transform_linkedin_data(response_data)
 
-        # Save to MongoDB
-        profile_data = Profile(linkedin_username=username, **transformed_data)
-        await db.profiles.update_one(
-            {"linkedin_username": username},
-            {"$set": profile_data.dict(by_alias=True)},
-            upsert=True,
-        )
+        logger.info(f"Successfully retrieved CV data for user: {username}")
 
+        profile = create_profile_from_linkedin_data(response_data)
+        await profile.create()
         logger.debug(f"Saved profile data to MongoDB for user: {username}")
-        return JSONResponse(content=transformed_data)
+
+        return JSONResponse(content=json.loads(profile.json(exclude={"id": True})))
 
     except HTTPException as http_exc:
         raise http_exc
