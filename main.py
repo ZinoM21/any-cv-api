@@ -9,30 +9,26 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-import logging
 
 from models import ProfileInfoRequest, Profile
 from transformers.linkedin import create_profile_from_linkedin_data
 from database import Database
-
-logger = logging.getLogger("uvicorn")
-
+from utils.logging_config import logger
 
 load_dotenv()
 
 app = FastAPI()
 logger.info("FastAPI application started")
 
+
 @app.on_event("startup")
 async def startup_db_client():
     await Database.connect()
-    logger.info("Connected to MongoDB")
 
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     await Database.disconnect()
-    logger.info("Disconnected from MongoDB")
 
 
 # Add CORS middleware
