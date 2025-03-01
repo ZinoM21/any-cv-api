@@ -2,8 +2,8 @@ import json
 from typing import Dict
 import requests
 
-from src.config.logger import logger
-from src.config.environment import env
+from src.config import logger
+from src.config import env
 
 
 class LinkedInAPI:

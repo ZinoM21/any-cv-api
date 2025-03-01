@@ -2,8 +2,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
 from src.domain.entities.profile import Profile
-from src.config.environment import env
-from src.config.logger import logger
+from src.config import env
+from src.config import logger
 
 
 class Database:

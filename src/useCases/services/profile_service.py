@@ -2,10 +2,10 @@ import re
 import json
 from typing import Dict, Optional
 
-from src.config.logger import logger
-from src.infrastructure.persistence.profile_repository import ProfileRepository
-from src.infrastructure.external.linkedin_api import LinkedInAPI
-from src.utils.transform_linkedin_data import transform_profile_data
+from src.config import logger
+from src.infrastructure.persistence import ProfileRepository
+from src.infrastructure.external import LinkedInAPI
+from src.utils import transform_profile_data
 
 
 class ProfileService:

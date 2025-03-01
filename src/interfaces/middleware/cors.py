@@ -1,8 +1,8 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 
-from src.config.environment import env
-from src.config.logger import logger
+from src.config import env
+from src.config import logger
 
 
 def setup_cors_middleware(app: FastAPI) -> None:

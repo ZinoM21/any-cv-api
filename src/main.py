@@ -9,25 +9,28 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
+from .config import env
+from .config import logger
+
 from .interfaces.dtos.request import ProfileInfoRequest
 from .interfaces.middleware.cors import setup_cors_middleware
+from .interfaces.controllers import profile_controller
+
 from .infrastructure.database.database import Database
-from .config.logger import logger
-from .config.environment import env
 
-from .infrastructure.external.linkedin_api import LinkedInAPI
-from .infrastructure.persistence.profile_repository import ProfileRepository
-from .useCases.services.profile_service import ProfileService
-
-app = FastAPI()
+app = FastAPI(
+    root_path="/api/v1",
+    title="AnyCV API",
+    description="API for AnyCV application",
+    version="0.1.0",
+)
 logger.info("FastAPI application started")
 
+# Middleware
 setup_cors_middleware(app)
 
-# Dependencies
-linkedin_api = LinkedInAPI()
-profile_repository = ProfileRepository()
-profile_service = ProfileService(profile_repository, linkedin_api)
+# Controllers / routes
+app.include_router(profile_controller.router)
 
 
 @app.on_event("startup")
@@ -55,33 +58,3 @@ async def shutdown_event():
 def read_root():
     logger.debug("Root endpoint accessed")
     return {"Hello": "World"}
-
-
-@app.post("/profile-info")
-async def profile_info(request: ProfileInfoRequest):
-    try:
-        profile_data = await profile_service.get_profile_info(request.link)
-        return JSONResponse(content=profile_data)
-
-    except ValueError as e:
-        logger.error(f"Controller error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-    except Exception as e:
-        logger.error(f"Controller error: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-# Add new endpoints using Beanie's features
-# @app.get("/profiles/{username}")
-# async def get_profile(username: str):
-#     profile = await Profile.find_one(Profile.linkedin_username == username)
-#     if not profile:
-#         raise HTTPException(status_code=404, detail="Profile not found")
-#     return profile
-
-
-# @app.get("/profiles")
-# async def list_profiles(skip: int = 0, limit: int = 10):
-#     profiles = await Profile.find_all().skip(skip).limit(limit).to_list()
-#     return profiles

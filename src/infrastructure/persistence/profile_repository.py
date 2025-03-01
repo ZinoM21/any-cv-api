@@ -1,7 +1,7 @@
 from typing import Optional, Dict
 
 from src.domain.entities.profile import Profile
-from src.config.logger import logger
+from src.config import logger
 
 
 class ProfileRepository:
