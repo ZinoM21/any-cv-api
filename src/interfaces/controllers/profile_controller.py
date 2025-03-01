@@ -27,10 +27,10 @@ router = APIRouter()
 @router.post("/profile-info")
 async def profile_info(
     request: ProfileInfoRequest,
-    service: Annotated[ProfileService, Depends(get_profile_service)],
+    profile_service: Annotated[ProfileService, Depends(get_profile_service)],
 ) -> JSONResponse:
     try:
-        profile_data = await service.get_profile_info(request.link)
+        profile_data = await profile_service.get_profile_info(request.link)
         return JSONResponse(content=profile_data)
 
     except ValueError as e:

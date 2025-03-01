@@ -9,11 +9,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
-from .config import env
-from .config import logger
+from .config import env, logger
 
-from .interfaces.dtos.request import ProfileInfoRequest
-from .interfaces.middleware.cors import setup_cors_middleware
+from .interfaces.dtos import ProfileInfoRequest
+from .interfaces.middleware import setup_cors_middleware
 from .interfaces.controllers import profile_controller
 
 from .infrastructure.database.database import Database
