@@ -1,15 +1,18 @@
 from typing import Optional, Dict
 
-from src.domain.entities.profile import Profile
-from src.config import logger
+from src.core.domain.models import Profile
+from src.core.domain.interfaces import IProfileRepository, ILogger
 
 
-class ProfileRepository:
+class ProfileRepository(IProfileRepository):
+    def __init__(self, logger: ILogger):
+        self.logger = logger
+
     async def find_by_username(self, username: str) -> Optional[Profile]:
         try:
             return await Profile.find_one(Profile.username == username)
         except Exception as e:
-            logger.error(f"Repository error finding profile: {str(e)}")
+            self.logger.error(f"Repository error finding profile: {str(e)}")
             raise
 
     async def create(self, profile_data: Dict) -> Profile:
@@ -18,5 +21,5 @@ class ProfileRepository:
             await profile.create()
             return profile
         except Exception as e:
-            logger.error(f"Repository error creating profile: {str(e)}")
+            self.logger.error(f"Repository error creating profile: {str(e)}")
             raise

@@ -2,17 +2,18 @@ import json
 from typing import Dict
 import requests
 
-from src.config import logger
 from src.config import env
+from src.core.domain.interfaces import ILinkedInAPI, ILogger
 
 
-class LinkedInAPI:
-    def __init__(self):
+class LinkedInAPI(ILinkedInAPI):
+    def __init__(self, logger: ILogger):
         self.headers = {
             "Content-Type": "application/json",
             "x-rapidapi-host": env.rapidapi_host,
             "x-rapidapi-key": env.rapidapi_key,
         }
+        self.logger = logger
 
     async def fetch_profile(self, username: str) -> Dict:
         try:
@@ -23,13 +24,13 @@ class LinkedInAPI:
             #     response = requests.post(rapidapi_url, json=payload, headers=headers)
 
             # if response.status_code == 404:
-            #     logger.error(
+            #     self.logger.error(
             #         f"RapidAPI request failed with status code: {response.status_code}"
             #     )
             #     return JSONResponse(content={"error": "User not found"}, status_code=404)
 
             # if response.status_code != 200:
-            #     logger.error(
+            #     self.logger.error(
             #         f"RapidAPI request failed with status code: {response.status_code}"
             #     )
             #     raise HTTPException(
@@ -49,5 +50,5 @@ class LinkedInAPI:
             return response.json()
 
         except Exception as e:
-            logger.error(f"LinkedIn API error: {str(e)}")
+            self.logger.error(f"LinkedIn API error: {str(e)}")
             raise

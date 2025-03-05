@@ -1,6 +1,7 @@
-from beanie import Document, Indexed
 from typing import List, Optional
 from datetime import datetime
+
+from beanie import Document, Indexed
 from pydantic import BaseModel, Field
 from uuid import UUID, uuid4
 

@@ -1,1 +1,1 @@
-from .linkedin_api import LinkedInAPI
+from .linkedin_api import LinkedInAPI, ILinkedInAPI

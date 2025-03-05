@@ -1,1 +1,1 @@
-from .profile_service import ProfileService
+from .profile_service import ProfileService, IProfileService

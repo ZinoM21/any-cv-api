@@ -1,16 +1,17 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
-from src.domain.entities.profile import Profile
 from src.config import env
-from src.config import logger
+from src.core.domain.interfaces import ILogger
+
+import src.core.domain.models as models
 
 
 class Database:
     client: AsyncIOMotorClient = None
 
     @classmethod
-    async def connect(cls):
+    async def connect(cls, logger: ILogger):
         """Initialize database connection and Beanie"""
         try:
             cls.client = AsyncIOMotorClient(
@@ -20,7 +21,10 @@ class Database:
             )
 
             # Initialize Beanie with the MongoDB client and document models
-            await init_beanie(database=cls.client.any_cv_db, document_models=[Profile])
+            await init_beanie(
+                database=cls.client.any_cv_db,
+                document_models=[models.Profile],
+            )
 
             logger.info("Successfully connected to MongoDB with Beanie")
         except Exception as e:
@@ -28,7 +32,7 @@ class Database:
             raise
 
     @classmethod
-    async def disconnect(cls):
+    async def disconnect(cls, logger: ILogger):
         """Disconnect from database"""
         if cls.client:
             cls.client.close()
@@ -36,7 +40,7 @@ class Database:
             logger.info("Disconnected from MongoDB")
 
     @classmethod
-    async def health_check(cls) -> bool:
+    async def health_check(cls, logger: ILogger) -> bool:
         """Check database health"""
         try:
             if cls.client:

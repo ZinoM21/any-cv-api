@@ -6,54 +6,55 @@ import time
 import json
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
-from .config import env, logger
+from .config import env
 
-from .interfaces.dtos import ProfileInfoRequest
-from .interfaces.middleware import setup_cors_middleware
-from .interfaces.controllers import profile_controller
+from src.deps import logger, Database
 
-from .infrastructure.database.database import Database
-
-app = FastAPI(
-    root_path="/api/v1",
-    title="AnyCV API",
-    description="API for AnyCV application",
-    version="0.1.0",
-)
-logger.info("FastAPI application started")
-
-# Middleware
-setup_cors_middleware(app)
-
-# Controllers / routes
-app.include_router(profile_controller.router)
+from src.controllers import profile_controller
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize all application resources and middleware on startup"""
+@asynccontextmanager
+async def lifespan(app: FastAPI, logger=logger, db=Database):
+    """Context manager to handle application lifespan events"""
+    logger.info("FastAPI application started")
     try:
         # 1. Validate environment
         env.validate()
         logger.info("Environment variables validated successfully")
 
         # 2. Initialize database connection
-        await Database.connect()
+        await db.connect(logger)
+
+        yield
 
     except Exception as e:
         logger.error(f"Application startup failed: {str(e)}")
         raise
 
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await Database.disconnect()
+    finally:
+        await db.disconnect(logger)
 
 
-@app.get("/")
-def read_root():
-    logger.debug("Root endpoint accessed")
-    return {"Hello": "World"}
+app = FastAPI(
+    root_path="/api/v1",
+    title="AnyCV API",
+    description="API for AnyCV application",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+# Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[env.frontend_url],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# Controllers / routes
+app.include_router(profile_controller)

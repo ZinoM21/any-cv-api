@@ -1,6 +1,6 @@
 """LinkedIn data transformation utilities."""
 
-from src.domain.entities.profile import (
+from src.core.domain.models.profile import (
     Position,
     Experience,
     Education,
