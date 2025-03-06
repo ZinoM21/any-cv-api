@@ -1,13 +1,23 @@
+from functools import lru_cache
 from typing import Annotated
+
 from fastapi import Depends
 
-from src.core.domain.interfaces import ILogger, ILinkedInAPI, IProfileRepository
-
-from src.infrastructure.external import LinkedInAPI
+from src.config import Settings, settings
+from src.core.domain.interfaces import ILinkedInAPI, ILogger, IProfileRepository
+from src.core.services import IProfileService, ProfileService
 from src.infrastructure.database import Database, ProfileRepository
+from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
 
-from src.useCases.services import ProfileService, IProfileService
+
+# Config
+@lru_cache
+def get_settings():
+    return settings
+
+
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
 # Logging

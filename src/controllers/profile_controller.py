@@ -4,8 +4,9 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.deps import get_profile_service, get_logger, LoggerDep
-from src.useCases.services import IProfileService
+from src.core.services import IProfileService
+
+from src.deps import get_profile_service, LoggerDep
 
 
 class ProfileInfoRequest(BaseModel):

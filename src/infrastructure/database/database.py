@@ -1,7 +1,7 @@
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
 
-from src.config import env
+from src.config import settings
 from src.core.domain.interfaces import ILogger
 
 import src.core.domain.models as models
@@ -15,7 +15,7 @@ class Database:
         """Initialize database connection and Beanie"""
         try:
             cls.client = AsyncIOMotorClient(
-                env.mongodb_url,
+                settings.mongodb_url,
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=5000,
             )

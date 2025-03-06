@@ -2,7 +2,7 @@ import json
 from typing import Dict
 import requests
 
-from src.config import env
+from src.config import settings
 from src.core.domain.interfaces import ILinkedInAPI, ILogger
 
 
@@ -10,8 +10,8 @@ class LinkedInAPI(ILinkedInAPI):
     def __init__(self, logger: ILogger):
         self.headers = {
             "Content-Type": "application/json",
-            "x-rapidapi-host": env.rapidapi_host,
-            "x-rapidapi-key": env.rapidapi_key,
+            "x-rapidapi-host": settings.rapidapi_host,
+            "x-rapidapi-key": settings.rapidapi_key,
         }
         self.logger = logger
 
@@ -40,14 +40,14 @@ class LinkedInAPI(ILinkedInAPI):
 
             # payload = {"link": f"https://www.linkedin.com/in/{username}"}
             # response = requests.post(
-            #     env.rapidapi_url, json=payload, headers=self.headers
+            #     settings.rapidapi_url, json=payload, headers=self.headers
             # )
 
             # if response.status_code == 404:
             #     raise ValueError("Profile not found")
 
             # response.raise_for_status()
-            return response.json()
+            # return response.json()
 
         except Exception as e:
             self.logger.error(f"LinkedIn API error: {str(e)}")
