@@ -1,11 +1,8 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.core.services import IProfileService
-from src.deps import LoggerDep, get_profile_service
+from src.deps import LoggerDep, ProfileServiceDep
 
 
 class ProfileInfoRequest(BaseModel):
@@ -18,7 +15,7 @@ profile_controller = APIRouter()
 @profile_controller.post("/profile-info")
 async def profile_info(
     request: ProfileInfoRequest,
-    profile_service: Annotated[IProfileService, Depends(get_profile_service)],
+    profile_service: ProfileServiceDep,
     logger: LoggerDep,
 ) -> JSONResponse:
     try:

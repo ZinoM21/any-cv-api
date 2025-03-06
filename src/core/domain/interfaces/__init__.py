@@ -1,3 +1,4 @@
-from .linkedinapi_interface import ILinkedInAPI
+from .data_transformer_interface import IDataTransformer
 from .logger_interface import ILogger
-from .profile_interface import IProfileRepository
+from .profile_repository_interface import IProfileRepository
+from .remote_data_source_interface import IRemoteDataSource

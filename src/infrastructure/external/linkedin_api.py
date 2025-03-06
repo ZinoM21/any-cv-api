@@ -1,11 +1,11 @@
 import json
-from typing import Dict
 
 from src.config import settings
-from src.core.domain.interfaces import ILinkedInAPI, ILogger
+from src.core.domain.interfaces import ILogger, IRemoteDataSource
+from src.core.domain.models import Profile
 
 
-class LinkedInAPI(ILinkedInAPI):
+class LinkedInAPI(IRemoteDataSource):
     def __init__(self, logger: ILogger):
         self.headers = {
             "Content-Type": "application/json",
@@ -14,7 +14,7 @@ class LinkedInAPI(ILinkedInAPI):
         }
         self.logger = logger
 
-    async def fetch_profile(self, username: str) -> Dict:
+    async def get_profile_data_by_username(self, username: str) -> Profile:
         try:
             # # TODO: Replace with actual API call
             with open("try/rapidAPI-response.json", "r") as file:

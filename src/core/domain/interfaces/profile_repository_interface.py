@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Optional
 
 from src.core.domain.models import Profile
 
@@ -10,5 +10,5 @@ class IProfileRepository(ABC):
         pass
 
     @abstractmethod
-    async def create(self, profile_data: Dict) -> Profile:
+    async def create(self, profile: Profile) -> Profile:
         pass

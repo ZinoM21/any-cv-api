@@ -1,34 +1,29 @@
 import json
 import re
-from abc import ABC, abstractmethod
 from typing import Dict
 
-from src.core.domain.interfaces import ILinkedInAPI, ILogger, IProfileRepository
-from src.utils import transform_profile_data
+from src.core.domain.interfaces import (
+    IDataTransformer,
+    ILogger,
+    IProfileRepository,
+    IRemoteDataSource,
+)
 
 
-class IProfileService(ABC):
-    @abstractmethod
-    def extract_username(self, link: str) -> str:
-        pass
-
-    @abstractmethod
-    async def get_profile_info(self, link: str) -> Dict:
-        pass
-
-
-class ProfileService(IProfileService):
+class ProfileService:
     def __init__(
         self,
         profile_repository: IProfileRepository,
-        linkedin_api: ILinkedInAPI,
+        remote_data_source: IRemoteDataSource,
         logger: ILogger,
+        data_transformer: IDataTransformer,
     ):
         self.profile_repository = profile_repository
-        self.linkedin_api = linkedin_api
+        self.remote_data_source = remote_data_source
         self.logger = logger
+        self.data_transformer = data_transformer
 
-    def extract_username(self, link: str) -> str:
+    def __extract_username(self, link: str) -> str:
         """Extract and validate LinkedIn username from URL or direct input"""
         username = link.strip()
 
@@ -47,26 +42,30 @@ class ProfileService(IProfileService):
         return username
 
     async def get_profile_info(self, link: str) -> Dict:
-        """Get profile information from cache or LinkedIn"""
-        username = self.extract_username(link)
+        """Get profile information from cache or remote data source"""
+        username = self.__extract_username(link)
         self.logger.debug(f"Extracted username: {username}")
 
         # Check cache / db first
         cached_profile = await self.profile_repository.find_by_username(username)
         if cached_profile:
-            self.logger.debug(f"Profile data found in db for: {username}. Returning...")
+            self.logger.debug(f"Profile record found in db for: {username}.")
             return json.loads(cached_profile.json(exclude={"id": True}))
 
         # Fetch from LinkedIn if not in cache
-        raw_profile_data = await self.linkedin_api.fetch_profile(username)
-        self.logger.debug(f"Profile data fetched from LinkedIn for: {username}")
+        raw_profile_data = await self.remote_data_source.get_profile_data_by_username(
+            username
+        )
+        self.logger.debug(
+            f"Profile data fetched from remote Data Source for: {username}"
+        )
 
-        # Transform linkedin_api data
-        profile_data = transform_profile_data(raw_profile_data)
+        # Transform raw profile data
+        profile = self.data_transformer.transform_profile_data(raw_profile_data)
         self.logger.debug(f"Profile data transformed for: {username}")
 
-        # Create and save new profile
-        profile = await self.profile_repository.create(profile_data)
-        self.logger.debug(f"Profile data saved to db for: {username}")
+        # Create and save new profile / cache profile
+        profile = await self.profile_repository.create(profile)
+        self.logger.debug(f"Profile record created for: {username}")
 
         return json.loads(profile.json(exclude={"id": True}))

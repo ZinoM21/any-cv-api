@@ -1,9 +1,9 @@
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-import src.core.domain.models as models
 from src.config import settings
 from src.core.domain.interfaces import ILogger
+from src.core.domain.models import __beanie_models__
 
 
 class Database:
@@ -21,8 +21,7 @@ class Database:
 
             # Initialize Beanie with the MongoDB client and document models
             await init_beanie(
-                database=cls.client.any_cv_db,
-                document_models=[models.Profile],
+                database=cls.client.any_cv_db, document_models=__beanie_models__
             )
 
             logger.info("Successfully connected to MongoDB with Beanie")
