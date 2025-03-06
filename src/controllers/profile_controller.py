@@ -1,12 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.services import IProfileService
-
-from src.deps import get_profile_service, LoggerDep
+from src.deps import LoggerDep, get_profile_service
 
 
 class ProfileInfoRequest(BaseModel):

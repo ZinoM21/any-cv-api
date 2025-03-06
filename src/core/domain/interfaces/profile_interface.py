@@ -3,6 +3,7 @@ from typing import Dict, Optional
 
 from src.core.domain.models import Profile
 
+
 class IProfileRepository(ABC):
     @abstractmethod
     async def find_by_username(self, username: str) -> Optional[Profile]:

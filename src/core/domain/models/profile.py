@@ -1,9 +1,9 @@
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
+from uuid import UUID, uuid4
 
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field
-from uuid import UUID, uuid4
 
 
 class Position(BaseModel):

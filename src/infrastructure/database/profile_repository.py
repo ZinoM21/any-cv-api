@@ -1,7 +1,7 @@
-from typing import Optional, Dict
+from typing import Dict, Optional
 
+from src.core.domain.interfaces import ILogger, IProfileRepository
 from src.core.domain.models import Profile
-from src.core.domain.interfaces import IProfileRepository, ILogger
 
 
 class ProfileRepository(IProfileRepository):

@@ -1,11 +1,10 @@
 """LinkedIn data transformation utilities."""
 
 from src.core.domain.models.profile import (
-    Position,
-    Experience,
     Education,
+    Experience,
+    Position,
     VolunteeringExperience,
-    Profile,
 )
 
 

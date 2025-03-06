@@ -1,6 +1,5 @@
 import json
 from typing import Dict
-import requests
 
 from src.config import settings
 from src.core.domain.interfaces import ILinkedInAPI, ILogger

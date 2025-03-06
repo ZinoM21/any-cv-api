@@ -1,10 +1,9 @@
-import re
 import json
-from typing import Dict, Optional
+import re
 from abc import ABC, abstractmethod
+from typing import Dict
 
-from src.core.domain.interfaces import IProfileRepository, ILogger, ILinkedInAPI
-
+from src.core.domain.interfaces import ILinkedInAPI, ILogger, IProfileRepository
 from src.utils import transform_profile_data
 
 
