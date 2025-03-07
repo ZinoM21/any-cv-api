@@ -69,3 +69,11 @@ class ProfileService:
         self.logger.debug(f"Profile record created for: {username}")
 
         return json.loads(profile.json(exclude={"id": True}))
+
+    async def get_profile(self, username) -> Dict:
+        profile = await self.profile_repository.find_by_username(username)
+
+        if not profile:
+            raise Exception("Profile not found")
+
+        return json.loads(profile.model_dump_json(exclude={"id": True}))

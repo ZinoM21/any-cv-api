@@ -12,6 +12,19 @@ class ProfileInfoRequest(BaseModel):
 profile_controller = APIRouter()
 
 
+@profile_controller.get("/profile/{username}")
+async def get_profile(
+    username: str, profile_service: ProfileServiceDep, logger: LoggerDep
+):
+    try:
+        profile = await profile_service.get_profile(username)
+        return JSONResponse(content=profile)
+
+    except Exception as e:
+        logger.error(f"Controller error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @profile_controller.post("/profile-info")
 async def profile_info(
     request: ProfileInfoRequest,
