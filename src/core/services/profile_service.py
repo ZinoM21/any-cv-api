@@ -2,6 +2,8 @@ import json
 import re
 from typing import Dict
 
+from fastapi.exceptions import HTTPException, RequestValidationError
+
 from src.core.domain.interfaces import (
     IDataTransformer,
     ILogger,
@@ -33,11 +35,11 @@ class ProfileService:
                 username,
             )
             if not match:
-                raise ValueError("Invalid LinkedIn URL format")
+                raise RequestValidationError("Invalid LinkedIn URL format")
             return match.group(1)
 
         if not re.match(r"^[\w\-]+$", username):
-            raise ValueError("Invalid username format")
+            raise RequestValidationError("Invalid username format")
 
         return username
 
@@ -50,7 +52,7 @@ class ProfileService:
         cached_profile = await self.profile_repository.find_by_username(username)
         if cached_profile:
             self.logger.debug(f"Profile record found in db for: {username}.")
-            return json.loads(cached_profile.json(exclude={"id": True}))
+            return json.loads(cached_profile.model_dump_json(exclude={"id": True}))
 
         # Fetch from LinkedIn if not in cache
         raw_profile_data = await self.remote_data_source.get_profile_data_by_username(
@@ -66,7 +68,10 @@ class ProfileService:
 
         # Check if profile data matches the username
         if profile.username != username:
-            raise Exception("Profile data does not match requested username")
+            raise HTTPException(
+                status_code=500,
+                detail="Fetched data does not match requested username: {username}",
+            )
 
         # Create and save new profile / cache profile
         profile = await self.profile_repository.create(profile)
@@ -78,6 +83,8 @@ class ProfileService:
         profile = await self.profile_repository.find_by_username(username)
 
         if not profile:
-            raise Exception("Profile not found")
+            raise HTTPException(
+                status_code=404, detail=f"Profile not found for username: {username}"
+            )
 
         return json.loads(profile.model_dump_json(exclude={"id": True}))

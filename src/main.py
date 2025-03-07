@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.controllers import profile_controller
 from src.deps import Database, logger
+from src.infrastructure.exception_handlers import add_exception_handlers
 
 
 @asynccontextmanager
@@ -14,7 +15,6 @@ async def lifespan(app: FastAPI, logger=logger, db=Database):
     logger.info("FastAPI application started")
     try:
         await db.connect(logger)
-
         yield
 
     except Exception as e:
@@ -43,6 +43,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Exception Handlers
+add_exception_handlers(app, logger)
 
 
 # Controllers / routes
