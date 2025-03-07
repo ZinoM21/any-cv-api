@@ -152,7 +152,7 @@ class DataTransformer(IDataTransformer):
         except Exception as e:
             raise ValueError(f"Error formatting volunteering experience: {str(e)}")
 
-    def transform_profile_data(self, data: dict) -> dict:
+    def transform_profile_data(self, data: dict) -> Profile:
         """Transform LinkedIn API response to match frontend types."""
         try:
             linkedin_data = data["data"]
