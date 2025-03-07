@@ -1,5 +1,7 @@
 import json
 
+from fastapi import HTTPException
+
 from src.config import settings
 from src.core.domain.interfaces import ILogger, IRemoteDataSource
 from src.core.domain.models import Profile
@@ -17,7 +19,7 @@ class LinkedInAPI(IRemoteDataSource):
     async def get_profile_data_by_username(self, username: str) -> Profile:
         try:
             # # TODO: Replace with actual API call
-            with open("try/rapidAPI-response.json", "r") as file:
+            with open(f"try/{username}.json", "r") as file:
                 return json.load(file)
 
             # if file coulnt be found, raise HTTPException 404

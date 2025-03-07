@@ -72,7 +72,7 @@ class ProfileService:
         profile = await self.profile_repository.create(profile)
         self.logger.debug(f"Profile record created for: {username}")
 
-        return json.loads(profile.json(exclude={"id": True}))
+        return json.loads(profile.model_dump_json(exclude={"id": True}))
 
     async def get_profile(self, username) -> Dict:
         profile = await self.profile_repository.find_by_username(username)

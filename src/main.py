@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI, logger=logger, db=Database):
 
 # Init App
 app = FastAPI(
-    root_path="/api/v1",
+    root_path="/api",
     title="AnyCV API",
     description="API for AnyCV application",
     version="0.1.0",
@@ -46,4 +46,4 @@ app.add_middleware(
 
 
 # Controllers / routes
-app.include_router(profile_controller)
+app.include_router(profile_controller, prefix="/v1")
