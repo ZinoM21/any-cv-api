@@ -64,6 +64,10 @@ class ProfileService:
         profile = self.data_transformer.transform_profile_data(raw_profile_data)
         self.logger.debug(f"Profile data transformed for: {username}")
 
+        # Check if profile data matches the username
+        if profile.username != username:
+            raise Exception("Profile data does not match requested username")
+
         # Create and save new profile / cache profile
         profile = await self.profile_repository.create(profile)
         self.logger.debug(f"Profile record created for: {username}")

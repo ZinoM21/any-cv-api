@@ -20,6 +20,12 @@ class LinkedInAPI(IRemoteDataSource):
             with open("try/rapidAPI-response.json", "r") as file:
                 return json.load(file)
 
+            # if file coulnt be found, raise HTTPException 404
+            if not file:
+                raise HTTPException(
+                    status_code=404, detail="No Profile under this username"
+                )
+
             #     response = requests.post(rapidapi_url, json=payload, headers=headers)
 
             # if response.status_code == 404:
