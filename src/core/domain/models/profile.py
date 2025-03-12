@@ -65,6 +65,7 @@ class Profile(Document):
     class Settings:
         name = "profiles"
         use_revision = True  # enable optimistic concurrency control
+        validate_on_save = True
 
 
 class UpdateProfile(BaseModel):
