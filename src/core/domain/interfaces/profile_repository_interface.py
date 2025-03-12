@@ -12,3 +12,7 @@ class IProfileRepository(ABC):
     @abstractmethod
     async def create(self, profile: Profile) -> Profile:
         pass
+
+    @abstractmethod
+    async def update(self, profile: Profile, new_data: dict) -> Profile:
+        pass

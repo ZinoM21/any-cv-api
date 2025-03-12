@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Annotated, List, Optional
 from uuid import UUID, uuid4
 
 from beanie import Document, Indexed
@@ -66,5 +66,15 @@ class Profile(Document):
         name = "profiles"
         use_revision = True  # enable optimistic concurrency control
 
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat(), UUID: lambda v: str(v)}
+
+class UpdateProfile(BaseModel):
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    profilePictureUrl: Optional[str] = None
+    jobTitle: Optional[str] = None
+    headline: Optional[str] = None
+    about: Optional[str] = None
+    experiences: Optional[List[Experience]] = None
+    education: Optional[List[Education]] = None
+    skills: Optional[List[str]] = None
+    volunteering: Optional[List[VolunteeringExperience]] = None

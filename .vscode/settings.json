@@ -7,5 +7,7 @@
       "source.fixAll.ruff": "explicit",
       "source.organizeImports.ruff": "explicit"
     }
-  }
+  },
+  "python.analysis.autoFormatStrings": true,
+  "python.analysis.typeCheckingMode": "standard"
 }

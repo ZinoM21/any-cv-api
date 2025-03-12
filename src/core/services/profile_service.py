@@ -10,6 +10,7 @@ from src.core.domain.interfaces import (
     IProfileRepository,
     IRemoteDataSource,
 )
+from src.core.domain.models import UpdateProfile
 
 
 class ProfileService:
@@ -79,7 +80,7 @@ class ProfileService:
 
         return json.loads(profile.model_dump_json(exclude={"id": True}))
 
-    async def get_profile(self, username) -> Dict:
+    async def get_profile(self, username: str) -> Dict:
         profile = await self.profile_repository.find_by_username(username)
 
         if not profile:
@@ -88,3 +89,20 @@ class ProfileService:
             )
 
         return json.loads(profile.model_dump_json(exclude={"id": True}))
+
+    async def update_profile(self, username: str, data: UpdateProfile) -> dict:
+        """Update a user profile with the provided data"""
+        profile = await self.profile_repository.find_by_username(username)
+
+        if not profile:
+            raise HTTPException(
+                status_code=404, detail=f"Profile not found for username: {username}"
+            )
+
+        data_dict = data.model_dump(
+            exclude_unset=True,
+        )
+
+        updated_profile = await self.profile_repository.update(profile, data_dict)
+
+        return json.loads(updated_profile.model_dump_json(exclude={"id": True}))

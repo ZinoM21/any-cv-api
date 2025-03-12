@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.decorators import handle_exceptions
+from src.core.domain.models import UpdateProfile
 from src.deps import LoggerDep, ProfileServiceDep
 
 
@@ -22,12 +23,23 @@ async def get_profile(
     return JSONResponse(content=profile)
 
 
+@profile_controller.patch("/profile/{username}")
+@handle_exceptions()
+async def update_profile(
+    username: str,
+    profile_data: UpdateProfile,
+    profile_service: ProfileServiceDep,
+):
+    """Update a user profile with partial data"""
+    updated_profile = await profile_service.update_profile(username, profile_data)
+    return JSONResponse(content=updated_profile)
+
+
 @profile_controller.post("/profile-info")
 @handle_exceptions()
 async def profile_info(
     request: ProfileInfoRequest,
     profile_service: ProfileServiceDep,
-    logger: LoggerDep,
 ) -> JSONResponse:
     profile_data = await profile_service.get_profile_info(request.link)
     return JSONResponse(content=profile_data)

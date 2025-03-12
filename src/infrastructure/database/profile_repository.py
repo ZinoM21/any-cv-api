@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from src.core.decorators import handle_exceptions
@@ -14,5 +15,15 @@ class ProfileRepository(IProfileRepository):
         return await Profile.find_one(Profile.username == username)
 
     @handle_exceptions()
-    async def create(self, profile: Profile):
+    async def create(self, profile: Profile) -> Profile:
         return await profile.create()
+
+    @handle_exceptions()
+    async def update(self, profile: Profile, new_data: dict) -> Profile:
+        # Set the updated_at field to current timestamp
+        new_data["updated_at"] = datetime.now(timezone.utc)
+
+        # Update the document and return the updated version
+        updated_profile = await profile.update({"$set": new_data})
+
+        return updated_profile
