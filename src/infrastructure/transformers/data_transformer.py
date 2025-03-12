@@ -138,7 +138,7 @@ class DataTransformer(IDataTransformer):
                 role=vol["title"],
                 organization=vol["subtitle"],
                 organizationProfileUrl=vol.get("companyLink1"),
-                Cause=vol.get("metadata", ""),
+                cause=vol.get("metadata", ""),
                 startDate=start_date,
                 endDate=end_date,
                 description=" ".join(

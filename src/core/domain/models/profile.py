@@ -40,7 +40,7 @@ class VolunteeringExperience(BaseModel):
     role: str
     organization: str
     organizationProfileUrl: Optional[str] = None
-    Cause: str
+    cause: str
     startDate: str
     endDate: Optional[str] = None
     description: str
@@ -48,7 +48,7 @@ class VolunteeringExperience(BaseModel):
 
 class Profile(Document):
     id: UUID = Field(default_factory=uuid4)
-    username: Indexed(str, unique=True)  # indexed field for faster lookups
+    username: Annotated[str, Indexed(unique=True)]
     firstName: str
     lastName: str
     profilePictureUrl: Optional[str] = None
