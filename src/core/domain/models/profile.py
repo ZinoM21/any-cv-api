@@ -11,7 +11,7 @@ class Position(BaseModel):
     startDate: str
     endDate: Optional[str] = None
     duration: Optional[str] = None
-    description: str
+    description: Optional[str] = None
     location: Optional[str] = None
     workSetting: Optional[str] = None
 
