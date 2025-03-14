@@ -6,7 +6,7 @@ services:
     plan: free
     repo: https://github.com/ZinoM21/any-cv-api
     branch: main
-    autoDeploy: false
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
+    healthCheckPath: /api/healthz
