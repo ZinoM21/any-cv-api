@@ -2,9 +2,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "AnyCV API"
+    app_name: str
 
-    port: int = 8000
+    port: int
 
     mongodb_url: str
 
@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     rapidapi_host: str
     rapidapi_key: str
 
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str
 
     model_config = SettingsConfigDict(env_file=".env")
 
