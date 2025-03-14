@@ -1,1 +1,1 @@
-from .profile_controller import profile_controller
+from .profile_controller import profile_controller_v1

@@ -11,15 +11,15 @@ class ProfileInfoRequest(BaseModel):
     link: str
 
 
-profile_controller = APIRouter()
+profile_controller_v1 = APIRouter(prefix="/v1/profile")
 
 
-@profile_controller.get("/healthz")
+@profile_controller_v1.get("/healthz")
 async def healthz():
     return JSONResponse(content={"status": "ok"})
 
 
-@profile_controller.get("/profile/{username}")
+@profile_controller_v1.get("/{username}")
 @handle_exceptions()
 async def get_profile(
     username: str, profile_service: ProfileServiceDep, logger: LoggerDep
@@ -28,7 +28,7 @@ async def get_profile(
     return JSONResponse(content=profile)
 
 
-@profile_controller.patch("/profile/{username}")
+@profile_controller_v1.patch("/{username}")
 @handle_exceptions()
 async def update_profile(
     username: str,
@@ -40,7 +40,7 @@ async def update_profile(
     return JSONResponse(content=updated_profile)
 
 
-@profile_controller.post("/profile-info")
+@profile_controller_v1.post("/info")
 @handle_exceptions()
 async def profile_info(
     request: ProfileInfoRequest,
