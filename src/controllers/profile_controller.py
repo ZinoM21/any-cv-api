@@ -40,11 +40,12 @@ async def update_profile(
     return JSONResponse(content=updated_profile)
 
 
-@profile_controller_v1.post("/info")
+@profile_controller_v1.get("/info/{username}")
 @handle_exceptions()
 async def profile_info(
-    request: ProfileInfoRequest,
+    username: str,
     profile_service: ProfileServiceDep,
 ) -> JSONResponse:
-    profile_data = await profile_service.get_profile_info(request.link)
+    """Get profile info based on the username"""
+    profile_data = await profile_service.get_profile_info(username)
     return JSONResponse(content=profile_data)
