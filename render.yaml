@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: any-cv-api-prod
+    runtime: python
+    region: frankfurt
+    plan: free
+    repo: https://github.com/ZinoM21/any-cv-api
+    branch: main
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /

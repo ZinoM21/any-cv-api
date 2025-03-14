@@ -14,6 +14,11 @@ class ProfileInfoRequest(BaseModel):
 profile_controller = APIRouter()
 
 
+@profile_controller.get("/healthz")
+async def healthz():
+    return JSONResponse(content={"status": "ok"})
+
+
 @profile_controller.get("/profile/{username}")
 @handle_exceptions()
 async def get_profile(
