@@ -20,7 +20,7 @@ class Experience(BaseModel):
     company: str
     companyProfileUrl: Optional[str] = None
     companyLogoUrl: Optional[str] = None
-    positions: List[Position]
+    positions: Annotated[List[Position], Field(min_length=1)]
 
 
 class Education(BaseModel):
@@ -40,14 +40,14 @@ class VolunteeringExperience(BaseModel):
     role: str
     organization: str
     organizationProfileUrl: Optional[str] = None
-    cause: str
     startDate: str
     endDate: Optional[str] = None
-    description: str
+    cause: Optional[str]
+    description: Optional[str]
 
 
 class Profile(Document):
-    id: UUID = Field(default_factory=uuid4)
+    id: UUID = Field(default_factory=uuid4)  # type: ignore
     username: Annotated[str, Indexed(unique=True)]
     firstName: str
     lastName: str
@@ -59,8 +59,12 @@ class Profile(Document):
     education: List[Education] = []
     skills: List[str] = []
     volunteering: List[VolunteeringExperience] = []
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: Annotated[
+        datetime, Field(default_factory=lambda: datetime.now(timezone.utc))
+    ]
+    updated_at: Annotated[
+        datetime, Field(default_factory=lambda: datetime.now(timezone.utc))
+    ]
 
     class Settings:
         name = "profiles"
