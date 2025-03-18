@@ -1,5 +1,7 @@
-from src.core.domain.interfaces.logger_interface import ILogger
+from datetime import datetime
+
 from src.core.domain.interfaces import IDataTransformer
+from src.core.domain.interfaces.logger_interface import ILogger
 from src.core.domain.models.profile import (
     Education,
     Experience,
@@ -18,8 +20,17 @@ class DataTransformer(IDataTransformer):
         try:
             date_parts = caption.split(" · ")
             dates = date_parts[0].split(" - ")
-            start_date = dates[0].strip()
-            end_date = dates[1].strip() if len(dates) > 1 else None
+            start_date_str = dates[0].strip()
+            end_date_str = dates[1].strip() if len(dates) > 1 else None
+
+            start_date = datetime.fromisoformat(start_date_str)
+            # If end date is "Present" or similar, set to None
+            end_date = (
+                None
+                if not end_date_str or end_date_str.lower() in ["present", "current"]
+                else datetime.fromisoformat(end_date_str)
+            )
+
             duration = date_parts[1] if len(date_parts) > 1 else None
             return start_date, end_date, duration
         except Exception as e:

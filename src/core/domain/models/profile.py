@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 
 class Position(BaseModel):
     title: str
-    startDate: str
-    endDate: Optional[str] = None
+    startDate: datetime
+    endDate: Optional[datetime] = None
     duration: Optional[str] = None
     description: Optional[str] = None
     location: Optional[str] = None
@@ -29,8 +29,8 @@ class Education(BaseModel):
     schoolPictureUrl: Optional[str] = None
     degree: str
     fieldOfStudy: Optional[str] = None
-    startDate: str
-    endDate: Optional[str] = None
+    startDate: datetime
+    endDate: Optional[datetime] = None
     grade: Optional[str] = None
     activities: Optional[str] = None
     description: Optional[str] = None
@@ -41,8 +41,8 @@ class VolunteeringExperience(BaseModel):
     organization: str
     organizationProfileUrl: Optional[str] = None
     organizationLogoUrl: Optional[str] = None
-    startDate: str
-    endDate: Optional[str] = None
+    startDate: datetime
+    endDate: Optional[datetime] = None
     cause: Optional[str]
     description: Optional[str]
 
