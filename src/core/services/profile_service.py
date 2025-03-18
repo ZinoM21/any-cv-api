@@ -53,7 +53,11 @@ class ProfileService:
         cached_profile = await self.profile_repository.find_by_username(username)
         if cached_profile:
             self.logger.debug(f"Profile record found in db for: {username}.")
-            return json.loads(cached_profile.model_dump_json(exclude={"id": True}))
+            return json.loads(
+                cached_profile.model_dump_json(
+                    exclude={"id": True, "updated_at": True, "created_at": True}
+                )
+            )
 
         # Fetch from LinkedIn if not in cache
         raw_profile_data = await self.remote_data_source.get_profile_data_by_username(
@@ -78,7 +82,11 @@ class ProfileService:
         profile = await self.profile_repository.create(profile)
         self.logger.debug(f"Profile record created for: {username}")
 
-        return json.loads(profile.model_dump_json(exclude={"id": True}))
+        return json.loads(
+            profile.model_dump_json(
+                exclude={"id": True, "updated_at": True, "created_at": True}
+            )
+        )
 
     async def get_profile(self, username: str) -> Dict:
         profile = await self.profile_repository.find_by_username(username)
@@ -88,7 +96,11 @@ class ProfileService:
                 status_code=404, detail=f"Profile not found for username: {username}"
             )
 
-        return json.loads(profile.model_dump_json(exclude={"id": True}))
+        return json.loads(
+            profile.model_dump_json(
+                exclude={"id": True, "updated_at": True, "created_at": True}
+            )
+        )
 
     async def update_profile(self, username: str, data: UpdateProfile) -> dict:
         """Update a user profile with the provided data"""
@@ -105,4 +117,8 @@ class ProfileService:
 
         updated_profile = await self.profile_repository.update(profile, data_dict)
 
-        return json.loads(updated_profile.model_dump_json(exclude={"id": True}))
+        return json.loads(
+            updated_profile.model_dump_json(
+                exclude={"id": True, "updated_at": True, "created_at": True}
+            )
+        )
