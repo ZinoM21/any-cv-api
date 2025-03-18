@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.config import settings
-from src.controllers import profile_controller_v1
+from src.controllers import profile_controller_v1, file_controller_v1
 from src.deps import Database, logger
 from src.infrastructure.exception_handlers import add_exception_handlers
 
@@ -51,6 +51,7 @@ add_exception_handlers(app, logger)
 
 # Controllers / routes
 app.include_router(profile_controller_v1)
+app.include_router(file_controller_v1)
 
 
 @app.get("/healthz")

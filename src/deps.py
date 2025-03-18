@@ -9,12 +9,14 @@ from src.core.domain.interfaces import (
     ILogger,
     IProfileRepository,
     IRemoteDataSource,
+    IFileService,
 )
 from src.core.services import ProfileService
 from src.infrastructure.database import Database, ProfileRepository
 from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
 from src.infrastructure.transformers import DataTransformer
+from src.core.services.supabase_file_service import SupabaseFileService
 
 
 # Config
@@ -73,3 +75,11 @@ def get_profile_service(
 
 
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+
+# File Service
+def get_file_service(logger: LoggerDep) -> IFileService:
+    return SupabaseFileService(logger)
+
+
+FileServiceDep = Annotated[IFileService, Depends(get_file_service)]
