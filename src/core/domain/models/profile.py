@@ -40,6 +40,7 @@ class VolunteeringExperience(BaseModel):
     role: str
     organization: str
     organizationProfileUrl: Optional[str] = None
+    organizationLogoUrl: Optional[str] = None
     startDate: str
     endDate: Optional[str] = None
     cause: Optional[str]

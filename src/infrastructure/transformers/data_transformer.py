@@ -1,3 +1,4 @@
+from src.core.domain.interfaces.logger_interface import ILogger
 from src.core.domain.interfaces import IDataTransformer
 from src.core.domain.models.profile import (
     Education,
@@ -10,7 +11,7 @@ from src.core.domain.models.profile import (
 
 class DataTransformer(IDataTransformer):
     def __init__(self, logger):
-        self.logger = logger
+        self.logger: ILogger = logger
 
     def __extract_date_info(self, caption: str) -> tuple:
         """Helper to extract start date, end date and duration from caption."""
@@ -138,6 +139,7 @@ class DataTransformer(IDataTransformer):
                 role=vol["title"],
                 organization=vol["subtitle"],
                 organizationProfileUrl=vol.get("companyLink1"),
+                organizationLogoUrl=vol.get("logo"),
                 cause=vol.get("metadata", ""),
                 startDate=start_date,
                 endDate=end_date,
