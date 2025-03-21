@@ -1,5 +1,4 @@
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.core.decorators import handle_exceptions
@@ -16,7 +15,7 @@ profile_controller_v1 = APIRouter(prefix="/v1/profile")
 
 @profile_controller_v1.get("/healthz")
 async def healthz():
-    return JSONResponse(content={"status": "ok"})
+    return {"status": "ok"}
 
 
 @profile_controller_v1.get("/{username}")
@@ -24,8 +23,7 @@ async def healthz():
 async def get_profile(
     username: str, profile_service: ProfileServiceDep, logger: LoggerDep
 ):
-    profile = await profile_service.get_profile(username)
-    return JSONResponse(content=profile)
+    return await profile_service.get_profile(username)
 
 
 @profile_controller_v1.patch("/{username}")
@@ -34,10 +32,10 @@ async def update_profile(
     username: str,
     profile_data: UpdateProfile,
     profile_service: ProfileServiceDep,
+    logger: LoggerDep,
 ):
     """Update a user profile with partial data"""
-    updated_profile = await profile_service.update_profile(username, profile_data)
-    return JSONResponse(content=updated_profile)
+    return await profile_service.update_profile(username, profile_data)
 
 
 @profile_controller_v1.get("/info/{username}")
@@ -45,7 +43,6 @@ async def update_profile(
 async def profile_info(
     username: str,
     profile_service: ProfileServiceDep,
-) -> JSONResponse:
+):
     """Get profile info based on the username"""
-    profile_data = await profile_service.get_profile_info(username)
-    return JSONResponse(content=profile_data)
+    return await profile_service.get_profile_info(username)

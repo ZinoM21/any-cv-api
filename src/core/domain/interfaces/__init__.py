@@ -3,3 +3,5 @@ from .logger_interface import ILogger
 from .profile_repository_interface import IProfileRepository
 from .remote_data_source_interface import IRemoteDataSource
 from .file_service_interface import IFileService
+from .user_repository_interface import IUserRepository
+from .auth_service_interface import IAuthService

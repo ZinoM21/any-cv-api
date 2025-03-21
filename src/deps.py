@@ -5,18 +5,20 @@ from fastapi import Depends
 
 from src.config import Settings, settings
 from src.core.domain.interfaces import (
+    IAuthService,
     IDataTransformer,
+    IFileService,
     ILogger,
     IProfileRepository,
     IRemoteDataSource,
-    IFileService,
+    IUserRepository,
 )
-from src.core.services import ProfileService
-from src.infrastructure.database import Database, ProfileRepository
+from src.core.services import AuthService, ProfileService
+from src.core.services.supabase_file_service import SupabaseFileService
+from src.infrastructure.database import Database, ProfileRepository, UserRepository
 from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
 from src.infrastructure.transformers import DataTransformer
-from src.core.services.supabase_file_service import SupabaseFileService
 
 
 # Config
@@ -57,6 +59,10 @@ def get_profile_repository(logger: LoggerDep) -> IProfileRepository:
     return ProfileRepository(logger)
 
 
+def get_user_repository(logger: LoggerDep) -> IUserRepository:
+    return UserRepository(logger)
+
+
 # Data Transformer
 def get_data_transformer(logger: LoggerDep) -> IDataTransformer:
     return DataTransformer(logger)
@@ -75,6 +81,16 @@ def get_profile_service(
 
 
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+
+def get_auth_service(
+    user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
+    logger: LoggerDep,
+) -> IAuthService:
+    return AuthService(user_repository, logger)
+
+
+AuthServiceDep = Annotated[IAuthService, Depends(get_auth_service)]
 
 
 # File Service
