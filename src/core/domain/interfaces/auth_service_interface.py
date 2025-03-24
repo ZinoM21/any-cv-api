@@ -1,6 +1,12 @@
 from abc import ABC, abstractmethod
 
-from src.core.domain.models.user import UserCreate, UserLogin, UserResponse
+from src.core.domain.models.user import (
+    AccessResponse,
+    TokensResponse,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
 
 
 class IAuthService(ABC):
@@ -10,6 +16,11 @@ class IAuthService(ABC):
         pass
 
     @abstractmethod
-    async def authenticate_user(self, user_data: UserLogin) -> UserResponse:
+    async def authenticate_user(self, request_data: UserLogin) -> TokensResponse:
         """Authenticate a user and return the user if credentials are valid"""
+        pass
+
+    @abstractmethod
+    async def refresh_token(self, refresh_token: str) -> AccessResponse:
+        """Refresh access token"""
         pass

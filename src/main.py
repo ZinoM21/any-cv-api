@@ -12,6 +12,7 @@ from src.controllers import (
 )
 from src.deps import Database, logger
 from src.infrastructure.exception_handlers import add_exception_handlers
+from src.infrastructure.middleware import AuthMiddleware
 
 
 @asynccontextmanager
@@ -48,6 +49,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_middleware(AuthMiddleware)
 
 # Exception Handlers
 add_exception_handlers(app, logger)

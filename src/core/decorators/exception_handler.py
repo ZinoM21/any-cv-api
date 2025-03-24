@@ -1,5 +1,9 @@
+import inspect
 from functools import wraps
-from typing import Any, Awaitable, Callable, Optional, TypeVar
+from typing import (
+    Optional,
+    TypeVar,
+)
 
 from fastapi.exceptions import HTTPException, RequestValidationError
 
@@ -11,6 +15,7 @@ T = TypeVar("T")
 def handle_exceptions(origin: Optional[str] = None):
     """
     Decorator that handles exceptions in controller endpoints.
+    Works with both synchronous and asynchronous functions.
 
     Args:
         origin: The origin of the exception for proper error reporting.
@@ -20,25 +25,48 @@ def handle_exceptions(origin: Optional[str] = None):
         Decorated function
     """
 
-    def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
-        @wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> T:
-            exception_origin = origin
-            # Get the module name and function name as origin if not provided
-            if exception_origin is None:
-                module_name = func.__module__.split(".")[-1]
-                function_name = func.__name__
-                exception_origin = f"{module_name}.{function_name}"
+    def get_exception_origin(func):
+        if origin is not None:
+            return origin
+        module_name = func.__module__.split(".")[-1]
+        function_name = func.__name__
+        return f"{module_name}.{function_name}"
 
-            try:
-                return await func(*args, **kwargs)
-            except (HTTPException, RequestValidationError, UncaughtException):
-                # Re-raise these exceptions directly
-                raise
-            except Exception as e:
-                # All other exceptions are considered uncaught
-                raise UncaughtException(origin=exception_origin, detail=str(e))
+    def decorator(func):
+        is_async = inspect.iscoroutinefunction(func)
 
-        return wrapper
+        if is_async:
+
+            @wraps(func)
+            async def async_wrapper(*args, **kwargs):
+                exception_origin = get_exception_origin(func)
+
+                try:
+                    return await func(*args, **kwargs)
+                except (HTTPException, RequestValidationError, UncaughtException):
+                    # Re-raise these exceptions directly
+                    raise
+                except Exception as e:
+                    # All other exceptions are considered uncaught
+                    raise UncaughtException(origin=exception_origin, detail=str(e))
+
+            return async_wrapper
+
+        else:
+
+            @wraps(func)
+            def sync_wrapper(*args, **kwargs):
+                exception_origin = get_exception_origin(func)
+
+                try:
+                    return func(*args, **kwargs)
+                except (HTTPException, RequestValidationError, UncaughtException):
+                    # Re-raise these exceptions directly
+                    raise
+                except Exception as e:
+                    # All other exceptions are considered uncaught
+                    raise UncaughtException(origin=exception_origin, detail=str(e))
+
+            return sync_wrapper
 
     return decorator

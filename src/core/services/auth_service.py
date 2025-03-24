@@ -1,9 +1,23 @@
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+import jwt
 from fastapi import HTTPException, status
+from jwt import ExpiredSignatureError, InvalidTokenError
 from passlib.context import CryptContext
 
+from src.config import settings
+from src.core.decorators.exception_handler import handle_exceptions
 from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
-from src.core.domain.models.user import User, UserCreate, UserLogin, UserResponse
-
+from src.core.domain.models.user import (
+    AccessResponse,
+    TokensResponse,
+    User,
+    UserCreate,
+    UserLogin,
+    UserResponse,
+)
+from src.core.exceptions import UnauthorizedHTTPException
 
 
 class AuthService(IAuthService):
@@ -14,7 +28,7 @@ class AuthService(IAuthService):
     ):
         self.user_repository = user_repository
         self.logger = logger
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        self.pwd_context = CryptContext(schemes=["bcrypt"])
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return self.pwd_context.verify(plain_password, hashed_password)
@@ -22,25 +36,66 @@ class AuthService(IAuthService):
     def get_password_hash(self, password: str) -> str:
         return self.pwd_context.hash(password)
 
+    def encode_with_expiry(self, data: dict, expires_in_minutes: int) -> str:
+        data.update(
+            {
+                "exp": datetime.now(timezone.utc)
+                + timedelta(minutes=expires_in_minutes),
+                "iat": datetime.now(timezone.utc),
+            }
+        )
 
-    async def authenticate_user(self, user_data: UserLogin) -> UserResponse:
-        user = await self.user_repository.find_by_email(user_data.email)
+        return jwt.encode(
+            data, settings.nextauth_secret, algorithm=settings.auth_algorithm
+        )
+
+    def decode_token(self, token: str) -> dict:
+        return jwt.decode(
+            token, settings.nextauth_secret, algorithms=[settings.auth_algorithm]
+        )
+
+    def create_tokens(self, user: User, type: Optional[str] = None) -> dict:
+        data_to_encode = {
+            "sub": str(user.id),
+            "email": user.email,
+            "username": user.username,
+        }
+
+        if type == "refresh":
+            return {
+                "access": self.encode_with_expiry(
+                    data_to_encode, settings.access_token_expire_minutes
+                ),
+            }
+
+        return {
+            "access": self.encode_with_expiry(
+                data_to_encode, settings.access_token_expire_minutes
+            ),
+            "refresh": self.encode_with_expiry(
+                data_to_encode, settings.refresh_token_expire_minutes
+            ),
+        }
+
+    @handle_exceptions()
+    async def authenticate_user(self, request_data: UserLogin) -> TokensResponse:
+        user = await self.user_repository.find_by_email(request_data.email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No user with this email",
             )
 
-        if not self.verify_password(user_data.password, user.pw_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+        if not self.verify_password(request_data.password, user.pw_hash):
+            raise UnauthorizedHTTPException(
                 detail="Incorrect password",
             )
 
-        user_response = user.model_dump(exclude={"pw_hash"})
-        return UserResponse(**user_response)
+        tokens = self.create_tokens(user)
+        return TokensResponse(**tokens)
 
 
+    @handle_exceptions()
     async def register_user(self, user_data: UserCreate) -> UserResponse:
         existing_username = await self.user_repository.find_by_username(
             user_data.username
@@ -69,3 +124,25 @@ class AuthService(IAuthService):
 
         user_response = new_user.model_dump(exclude={"pw_hash"})
         return UserResponse(**user_response)
+
+    @handle_exceptions()
+    async def refresh_token(self, refresh_token: str) -> AccessResponse:
+        try:
+            payload = self.decode_token(refresh_token)
+        except ExpiredSignatureError:
+            raise UnauthorizedHTTPException(detail="Refresh token has expired")
+        except InvalidTokenError:
+            raise UnauthorizedHTTPException(detail="Invalid refresh token")
+
+        username = payload.get("username")
+        if username is None:
+            raise UnauthorizedHTTPException(
+                detail="Invalid refresh token",
+            )
+
+        user = await self.user_repository.find_by_username(username)
+        if user is None:
+            raise UnauthorizedHTTPException(detail="User not found")
+
+        new_access_token = self.create_tokens(user, "refresh")
+        return AccessResponse(**new_access_token)
