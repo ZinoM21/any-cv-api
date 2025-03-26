@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     refresh_token_expire_minutes: int = 60 * 24 * 7
     auth_algorithm: str = "HS256"
     public_paths: List[str] = [
+        "/healthz",
         "/api/v1",
         "/api/v1/healthz",
         "/api/v1/profile/healthz",
