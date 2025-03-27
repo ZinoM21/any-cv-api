@@ -68,6 +68,7 @@ class Profile(Document):
     email: Optional[str] = None
     phone: Optional[str] = None
     location: Optional[str] = None
+    languages: List[str] = []
     experiences: List[Experience] = []
     education: List[Education] = []
     skills: List[str] = []
@@ -96,6 +97,7 @@ class UpdateProfile(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     location: Optional[str] = None
+    languages: Optional[List[str]] = None
     experiences: Optional[List[Experience]] = None
     education: Optional[List[Education]] = None
     skills: Optional[List[str]] = None

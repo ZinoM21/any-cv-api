@@ -398,6 +398,34 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
+    def __format_languages(self, languages_data: List[dict]) -> List[str]:
+        """Transforms raw language data into a list of formatted language strings.
+
+        Returns an empty list if no valid language entries are found.
+        """
+        formatted_languages = []
+        if not languages_data or not isinstance(languages_data, list):
+            return formatted_languages
+
+        for lang in languages_data:
+            try:
+                if not isinstance(lang, dict) or not lang.get("title"):
+                    continue
+
+                language_name = lang.get("title", "").strip()
+                proficiency = lang.get("caption", "").strip()
+
+                if language_name:
+                    if proficiency:
+                        formatted_languages.append(f"{language_name} - {proficiency}")
+                    else:
+                        formatted_languages.append(language_name)
+            except Exception as e:
+                self.logger.warn(f"Error formatting language entry: {str(e)}")
+                continue
+
+        return formatted_languages
+
     def transform_profile_data(self, data: dict) -> Profile | None:
         """Transform LinkedIn API response to match frontend types.
 
@@ -440,6 +468,9 @@ class DataTransformer(IDataTransformer):
                             f"Required field '{field}' is missing"
                         )
 
+                # Extract and format language data from LinkedIn
+                languages = self.__format_languages(linkedin_data.get("languages", []))
+
                 # Build profile data with safe defaults
                 profile_data = {
                     "username": linkedin_data.get("publicIdentifier", ""),
@@ -452,6 +483,7 @@ class DataTransformer(IDataTransformer):
                     "email": None,
                     "phone": None,
                     "location": linkedin_data.get("addressWithCountry", ""),
+                    "languages": languages,
                     "experiences": [
                         exp
                         for exp in [
