@@ -32,7 +32,6 @@ async def update_profile(
     username: str,
     profile_data: UpdateProfile,
     profile_service: ProfileServiceDep,
-    logger: LoggerDep,
 ):
     """Update a user profile with partial data"""
     return await profile_service.update_profile(username, profile_data)

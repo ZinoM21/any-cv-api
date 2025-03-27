@@ -8,11 +8,14 @@ class UvicornLogger(ILogger):
         self.logger = logging.getLogger("uvicorn")
         self.logger.setLevel(logging.DEBUG)
 
-    def info(self, message: str):
-        self.logger.info(message)
+    def info(self, message: object, *args: object):
+        self.logger.info(message, *args)
 
-    def error(self, message: str):
-        self.logger.error(message)
+    def error(self, message: object, *args: object):
+        self.logger.error(message, *args)
 
-    def debug(self, message: str):
-        self.logger.debug(message)
+    def warn(self, message: object, *args: object) -> None:
+        self.logger.warning(message, *args)
+
+    def debug(self, message: object, *args: object):
+        self.logger.debug(message, *args)

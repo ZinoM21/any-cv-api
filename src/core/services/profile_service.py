@@ -69,6 +69,11 @@ class ProfileService:
 
         # Transform raw profile data
         profile = self.data_transformer.transform_profile_data(raw_profile_data)
+        if not profile:
+            raise HTTPException(
+                status_code=500,
+                detail="Could not use the fetched data to create a profile",
+            )
         self.logger.debug(f"Profile data transformed for: {username}")
 
         # Check if profile data matches the username
