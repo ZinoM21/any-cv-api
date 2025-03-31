@@ -6,8 +6,7 @@ from fastapi import HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
 from passlib.context import CryptContext
 
-from src.config import settings
-from src.core.decorators.exception_handler import handle_exceptions
+from src.config import Settings
 from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
 from src.core.domain.models.user import (
     AccessResponse,
@@ -17,18 +16,18 @@ from src.core.domain.models.user import (
     UserLogin,
     UserResponse,
 )
-from src.core.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
 class AuthService(IAuthService):
     def __init__(
-        self,
-        user_repository: IUserRepository,
-        logger: ILogger,
+        self, user_repository: IUserRepository, logger: ILogger, settings: Settings
     ):
         self.user_repository = user_repository
         self.logger = logger
         self.pwd_context = CryptContext(schemes=["bcrypt"])
+        self.settings = settings
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return self.pwd_context.verify(plain_password, hashed_password)
@@ -46,12 +45,14 @@ class AuthService(IAuthService):
         )
 
         return jwt.encode(
-            data, settings.nextauth_secret, algorithm=settings.auth_algorithm
+            data, self.settings.auth_secret, algorithm=self.settings.auth_algorithm
         )
 
     def decode_token(self, token: str) -> dict:
         return jwt.decode(
-            token, settings.nextauth_secret, algorithms=[settings.auth_algorithm]
+            token,
+            self.settings.auth_secret,
+            algorithms=[self.settings.auth_algorithm],
         )
 
     def create_tokens(self, user: User, type: Optional[str] = None) -> dict:
@@ -64,16 +65,16 @@ class AuthService(IAuthService):
         if type == "refresh":
             return {
                 "access": self.encode_with_expiry(
-                    data_to_encode, settings.access_token_expire_minutes
+                    data_to_encode, self.settings.access_token_expire_minutes
                 ),
             }
 
         return {
             "access": self.encode_with_expiry(
-                data_to_encode, settings.access_token_expire_minutes
+                data_to_encode, self.settings.access_token_expire_minutes
             ),
             "refresh": self.encode_with_expiry(
-                data_to_encode, settings.refresh_token_expire_minutes
+                data_to_encode, self.settings.refresh_token_expire_minutes
             ),
         }
 
@@ -93,7 +94,6 @@ class AuthService(IAuthService):
 
         tokens = self.create_tokens(user)
         return TokensResponse(**tokens)
-
 
     @handle_exceptions()
     async def register_user(self, user_data: UserCreate) -> UserResponse:

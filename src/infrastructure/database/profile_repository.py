@@ -1,9 +1,9 @@
 from datetime import datetime, timezone
 from typing import Optional
 
-from src.core.decorators import handle_exceptions
 from src.core.domain.interfaces import ILogger, IProfileRepository
 from src.core.domain.models import Profile
+from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
 class ProfileRepository(IProfileRepository):

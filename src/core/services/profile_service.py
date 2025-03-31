@@ -68,7 +68,7 @@ class ProfileService:
         )
 
         # Transform raw profile data
-        profile = self.data_transformer.transform_profile_data(raw_profile_data)
+        profile = await self.data_transformer.transform_profile_data(raw_profile_data)
         if not profile:
             raise HTTPException(
                 status_code=500,

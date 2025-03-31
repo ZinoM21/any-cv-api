@@ -18,7 +18,7 @@ from src.core.services.supabase_file_service import SupabaseFileService
 from src.infrastructure.database import Database, ProfileRepository, UserRepository
 from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
-from src.infrastructure.transformers import DataTransformer
+from src.infrastructure.transformers.data_transformer import DataTransformer
 
 
 # Config
@@ -42,7 +42,7 @@ LoggerDep = Annotated[ILogger, Depends(get_logger)]
 
 
 # Database
-def get_db() -> Database:
+def get_db():
     return Database
 
 
@@ -50,8 +50,8 @@ DatabaseDep = Annotated[Database, Depends(get_db)]
 
 
 # External
-def get_linkedin_api(logger: LoggerDep) -> IRemoteDataSource:
-    return LinkedInAPI(logger)
+def get_linkedin_api(logger: LoggerDep, settings: SettingsDep) -> IRemoteDataSource:
+    return LinkedInAPI(logger, settings)
 
 
 # Repositories
@@ -63,20 +63,35 @@ def get_user_repository(logger: LoggerDep) -> IUserRepository:
     return UserRepository(logger)
 
 
-# Data Transformer
-def get_data_transformer(logger: LoggerDep) -> IDataTransformer:
-    return DataTransformer(logger)
-
-
 # Services
+
+
+# File Service
+def get_file_service(logger: LoggerDep, settings: SettingsDep) -> IFileService:
+    return SupabaseFileService(logger, settings)
+
+
+FileServiceDep = Annotated[IFileService, Depends(get_file_service)]
+
+
+# Data Transformer
+def get_data_transformer(
+    logger: LoggerDep, settings: SettingsDep, file_service: FileServiceDep
+) -> IDataTransformer:
+    return DataTransformer(logger, settings, file_service)
+
+
 def get_profile_service(
     profile_repository: Annotated[IProfileRepository, Depends(get_profile_repository)],
     remote_data_source: Annotated[IRemoteDataSource, Depends(get_linkedin_api)],
-    logger: LoggerDep,
     data_transformer: Annotated[IDataTransformer, Depends(get_data_transformer)],
+    logger: LoggerDep,
 ) -> ProfileService:
     return ProfileService(
-        profile_repository, remote_data_source, logger, data_transformer
+        profile_repository,
+        remote_data_source,
+        logger,
+        data_transformer,
     )
 
 
@@ -86,16 +101,9 @@ ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 def get_auth_service(
     user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
     logger: LoggerDep,
+    settings: SettingsDep,
 ) -> IAuthService:
-    return AuthService(user_repository, logger)
+    return AuthService(user_repository, logger, settings)
 
 
 AuthServiceDep = Annotated[IAuthService, Depends(get_auth_service)]
-
-
-# File Service
-def get_file_service(logger: LoggerDep) -> IFileService:
-    return SupabaseFileService(logger)
-
-
-FileServiceDep = Annotated[IFileService, Depends(get_file_service)]

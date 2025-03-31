@@ -1,9 +1,9 @@
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from src.config import settings
 from src.core.domain.interfaces import ILogger
 from src.core.domain.models import __beanie_models__
+from src.deps import settings
 
 
 class Database:

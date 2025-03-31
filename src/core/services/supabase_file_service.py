@@ -1,30 +1,34 @@
-from typing import Dict, List, Set
-from fastapi.exceptions import HTTPException
-from supabase import create_client, Client
+import mimetypes
+import os
+import uuid
+from typing import Optional
+from urllib.parse import unquote, urlparse
 
-from src.config import settings
+import aiohttp
+from fastapi.exceptions import HTTPException
+from supabase import Client, create_client
+
+from src.config import Settings
 from src.core.domain.interfaces import IFileService, ILogger
+from src.core.domain.models.file import ImageDownload, SignedUrl
+from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
 class SupabaseFileService(IFileService):
-    # Maximum file size (5MB by default)
-    MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024
 
-    # Allowed MIME types
-    ALLOWED_MIME_TYPES: Set[str] = {
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # docx
-    }
-
-    def __init__(self, logger: ILogger):
+    def __init__(self, logger: ILogger, settings: Settings):
         self.logger = logger
+        self.settings = settings
+
         self.supabase: Client = create_client(
-            settings.supabase_url, settings.supabase_key
+            self.settings.supabase_url,
+            self.settings.supabase_publishable_key,
         )
-        self.bucket_name = settings.supabase_bucket
+        self.supabase_service: Client = create_client(
+            self.settings.supabase_url,
+            self.settings.supabase_secret_key,
+        )
+        self.bucket_name = self.settings.supabase_bucket
 
     async def validate_file(self, file_type: str, file_size: int) -> bool:
         """
@@ -35,21 +39,44 @@ class SupabaseFileService(IFileService):
             file_size: Size of the file in bytes
 
         Returns:
-            True if file is valid, False otherwise
+            True if file of allowed type and size, False otherwise
         """
-        if file_type not in self.ALLOWED_MIME_TYPES:
+        if file_type not in self.settings.ALLOWED_MIME_TYPES:
             return False
 
-        if file_size > self.MAX_FILE_SIZE_BYTES:
+        if file_size > self.settings.MAX_FILE_SIZE_BYTES:
             return False
 
         return True
 
-    async def generate_presigned_url(
-        self, file_name: str, file_type: str, file_size: int
-    ) -> Dict:
+    @handle_exceptions()
+    async def generate_signed_url(self, file_path: str) -> SignedUrl:
         """
-        Generate a presigned URL for file upload
+        Generate a signed URL for file upload
+
+        Args:
+            file_path: Path of the file in storage
+
+        Returns:
+            Dict containing the signed URL and other metadata
+        """
+        try:
+            # Get signed URL from Supabase
+            response = self.supabase_service.storage.from_(
+                self.bucket_name
+            ).create_signed_url(file_path, expires_in=self.settings.EXPIRES_IN_SECONDS)
+
+            return SignedUrl(signed_url=response["signedUrl"])
+
+        except Exception as e:
+            raise Exception(f"Error generating signed URL: {str(e)}")
+
+    @handle_exceptions()
+    async def generate_signed_upload_url(
+        self, file_name: str, file_type: str, file_size: int
+    ) -> SignedUrl:
+        """
+        Generate a signed URL for file upload
 
         Args:
             file_name: Original name of the file
@@ -57,7 +84,7 @@ class SupabaseFileService(IFileService):
             file_size: Size of the file in bytes
 
         Returns:
-            Dict containing the presigned URL and upload details
+            Dict containing the signed URL and upload details
         """
         # Validate file first
         is_valid = await self.validate_file(file_type, file_size)
@@ -68,29 +95,100 @@ class SupabaseFileService(IFileService):
             )
 
         try:
-            # Generate a unique file path
-            import uuid
-            import os
-
             file_extension = os.path.splitext(file_name)[1]
             unique_filename = f"{uuid.uuid4()}{file_extension}"
 
-            # Get presigned URL from Supabase
             response = self.supabase.storage.from_(
                 self.bucket_name
             ).create_signed_upload_url(unique_filename)
 
-            # Log the presigned URL generation
-            self.logger.info(f"Generated presigned URL for file: {unique_filename}")
-
-            return {
-                "upload_url": response["signed_url"],
-                "file_path": unique_filename,
-                "expires_at": response["token"],
-            }
+            return SignedUrl(signed_url=response["signedUrl"])
 
         except Exception as e:
-            self.logger.error(f"Error generating presigned URL: {str(e)}")
-            raise HTTPException(
-                status_code=500, detail="Error generating presigned URL"
+            raise Exception(f"Error generating signed URL: {str(e)}")
+
+    @handle_exceptions()
+    async def download_remote_image(self, image_url: str) -> Optional[ImageDownload]:
+        """
+        Download an image from a remote URL
+
+        Args:
+            image_url: URL of the remote image
+
+        Returns:
+            The image download containing the data in bytes, filename and mimetype or None if failed
+        """
+        if not image_url:
+            return None
+
+        try:
+            # Filename
+            parsed_url = urlparse(image_url)
+            path = unquote(parsed_url.path)
+            base_filename = os.path.basename(path)
+
+            filename, file_ext = os.path.splitext(base_filename)
+            if not file_ext:
+                file_ext = ".jpg"
+            filename = f"{filename or base_filename}{file_ext}"
+
+            # Mimetype
+            mimetype = mimetypes.guess_type(image_url)[0] or "image/jpeg"
+
+            # Download the image
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url) as response:
+                    if response.status != 200:
+                        self.logger.error(
+                            f"Failed to download image from {image_url}: {response.status}"
+                        )
+                        return None
+
+                    image_data = await response.read()
+
+                    return ImageDownload(
+                        data=image_data,
+                        filename=filename,
+                        mimetype=mimetype,
+                    )
+
+        except Exception as e:
+            raise Exception(f"Error downloading remote image: {str(e)}")
+
+    @handle_exceptions()
+    async def upload_image(self, image_download: ImageDownload) -> Optional[str]:
+        """
+        Upload an image to Supabase storage
+
+        Args:
+            image_download: The image download with data in bytes, filename and mimetype
+
+        Returns:
+            The file path in Supabase storage or None if failed
+        """
+
+        try:
+            # Validate
+            is_valid = await self.validate_file(
+                image_download.mimetype, len(image_download.data)
             )
+            if not is_valid:
+                raise Exception(
+                    "Invalid file type or size exceeds the maximum allowed (10MB)",
+                )
+
+            # Upload / Upsert
+            self.supabase_service.storage.from_(self.bucket_name).upload(
+                path=image_download.filename,
+                file=image_download.data,
+                file_options={
+                    "content-type": image_download.mimetype,
+                    "upsert": "true",
+                },
+            )
+
+            return image_download.filename
+
+        except Exception as e:
+            raise Exception(f"Error uploading remote image: {str(e)}")
+

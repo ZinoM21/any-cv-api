@@ -7,7 +7,7 @@ from typing import (
 
 from fastapi.exceptions import HTTPException, RequestValidationError
 
-from src.core.exceptions import UncaughtException
+from src.infrastructure.exceptions.exceptions import UncaughtException
 
 T = TypeVar("T")
 
@@ -43,10 +43,10 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return await func(*args, **kwargs)
-                except (HTTPException, RequestValidationError, UncaughtException):
+                except (HTTPException, RequestValidationError):
                     # Re-raise these exceptions directly
                     raise
-                except Exception as e:
+                except (Exception, UncaughtException) as e:
                     # All other exceptions are considered uncaught
                     raise UncaughtException(origin=exception_origin, detail=str(e))
 
@@ -60,10 +60,10 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return func(*args, **kwargs)
-                except (HTTPException, RequestValidationError, UncaughtException):
+                except (HTTPException, RequestValidationError):
                     # Re-raise these exceptions directly
                     raise
-                except Exception as e:
+                except (Exception, UncaughtException) as e:
                     # All other exceptions are considered uncaught
                     raise UncaughtException(origin=exception_origin, detail=str(e))
 

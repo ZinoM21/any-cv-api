@@ -1,10 +1,12 @@
 import time
 import traceback
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from dateutil import parser as date_parser
 
-from src.core.domain.interfaces import IDataTransformer
+from src.config import Settings
+from src.core.domain.interfaces import IDataTransformer, IFileService
 from src.core.domain.interfaces.logger_interface import ILogger
 from src.core.domain.models.profile import (
     Education,
@@ -36,11 +38,10 @@ class DataTransformer(IDataTransformer):
     resilient against missing fields, malformed data, and API changes.
     """
 
-    MAX_RETRIES = 3
-    RETRY_DELAY = 1  # seconds
-
-    def __init__(self, logger):
+    def __init__(self, logger, settings: Settings, file_service=None):
         self.logger: ILogger = logger
+        self.settings: Settings = settings
+        self.file_service: Optional[IFileService] = file_service
 
     def _safe_get(self, data: Dict[str, Any], key: str, default: Any = None) -> Any:
         """Safely retrieve a value from a dictionary, returning default if key doesn't exist."""
@@ -60,6 +61,35 @@ class DataTransformer(IDataTransformer):
             ):
                 text_parts.append(item["text"])
         return " ".join(text_parts)
+
+    async def _process_image_url(self, image_url: str) -> str | None:
+        """
+        Process an image URL - if it's a LinkedIn URL, download and upload to our storage
+
+        Args:
+            image_url: The image URL to process
+
+        Returns:
+            The file path in storage (not the public URL)
+        """
+        if not image_url or not self.file_service:
+            return None
+
+        try:
+
+            parsed_url = urlparse(image_url)
+
+            if parsed_url.netloc in self.settings.LINKEDIN_MEDIA_DOMAINS:
+                image_download = await self.file_service.download_remote_image(
+                    image_url
+                )
+                if image_download:
+                    file_path = await self.file_service.upload_image(image_download)
+                    return file_path
+
+        except Exception as e:
+            self.logger.error(f"Error processing image URL: {str(e)}")
+            return None
 
     def __extract_date_info(self, caption: str) -> tuple:
         """Helper to extract start date, end date and duration from caption."""
@@ -108,7 +138,7 @@ class DataTransformer(IDataTransformer):
             )
             return "", ""
 
-    def __format_experience(self, exp: dict) -> Optional[Experience]:
+    async def __format_experience(self, exp: dict) -> Optional[Experience]:
         """Transforms raw experience data into an Experience object.
 
         Handles both single positions and multiple positions under one company.
@@ -122,6 +152,10 @@ class DataTransformer(IDataTransformer):
             if not exp.get("title"):
                 self.logger.warn("Experience missing required title field")
                 return None
+
+            # Process company logo
+            company_logo_url = exp.get("logo", "")
+            processed_logo_url = await self._process_image_url(company_logo_url)
 
             # Handle experiences with multiple positions (breakdown=true)
             if exp.get("breakdown"):
@@ -177,7 +211,7 @@ class DataTransformer(IDataTransformer):
                 return Experience(
                     company=exp["title"],
                     companyProfileUrl=exp.get("companyLink1", ""),
-                    companyLogoUrl=exp.get("logo", ""),
+                    companyLogoUrl=processed_logo_url,
                     positions=positions,
                 )
             else:
@@ -214,7 +248,7 @@ class DataTransformer(IDataTransformer):
                 return Experience(
                     company=company,
                     companyProfileUrl=exp.get("companyLink1", ""),
-                    companyLogoUrl=exp.get("logo", ""),
+                    companyLogoUrl=processed_logo_url,
                     positions=[
                         Position(
                             title=exp["title"],
@@ -233,7 +267,7 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
-    def __format_education(self, edu: dict) -> Optional[Education]:
+    async def __format_education(self, edu: dict) -> Optional[Education]:
         """Transforms raw education data into an Education object.
 
         Returns None if critical data is missing or malformed.
@@ -247,6 +281,11 @@ class DataTransformer(IDataTransformer):
                 self.logger.warn("Education missing required title field")
                 return None
 
+            # Process school logo
+            school_logo_url = edu.get("logo", "")
+            processed_logo_url = await self._process_image_url(school_logo_url)
+
+            # Extract date info
             start_date, end_date, _ = self.__extract_date_info(edu.get("caption", ""))
 
             # Default values for degree components
@@ -276,7 +315,7 @@ class DataTransformer(IDataTransformer):
             return Education(
                 school=edu["title"],
                 schoolProfileUrl=edu.get("companyLink1", ""),
-                schoolPictureUrl=edu.get("logo", ""),
+                schoolPictureUrl=processed_logo_url,
                 degree=degree,
                 fieldOfStudy=field_of_study,
                 startDate=start_date,
@@ -291,7 +330,9 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
-    def __format_volunteering(self, vol: dict) -> Optional[VolunteeringExperience]:
+    async def __format_volunteering(
+        self, vol: dict
+    ) -> Optional[VolunteeringExperience]:
         """Transforms raw volunteering data into a VolunteeringExperience object.
 
         Returns None if critical data is missing or malformed.
@@ -307,6 +348,10 @@ class DataTransformer(IDataTransformer):
                 )
                 return None
 
+            # Process organization logo
+            org_logo_url = vol.get("logo", "")
+            processed_logo_url = await self._process_image_url(org_logo_url)
+
             start_date, end_date, _ = self.__extract_date_info(vol.get("caption", ""))
 
             description = ""
@@ -320,7 +365,7 @@ class DataTransformer(IDataTransformer):
                 role=vol["title"],
                 organization=vol["subtitle"],
                 organizationProfileUrl=vol.get("companyLink1", ""),
-                organizationLogoUrl=vol.get("logo", ""),
+                organizationLogoUrl=processed_logo_url,
                 cause=vol.get("metadata", ""),
                 startDate=start_date,
                 endDate=end_date,
@@ -333,7 +378,7 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
-    def __format_project(self, project_data: dict) -> Optional[Project]:
+    async def __format_project(self, project_data: dict) -> Optional[Project]:
         """Transforms raw project data into a Project object.
 
         Returns None if critical data is missing or malformed.
@@ -426,7 +471,7 @@ class DataTransformer(IDataTransformer):
 
         return formatted_languages
 
-    def transform_profile_data(self, data: dict) -> Profile | None:
+    async def transform_profile_data(self, data: dict) -> Profile | None:
         """Transform LinkedIn API response to match frontend types.
 
         Implements retry logic for transient failures and comprehensive error handling.
@@ -445,7 +490,7 @@ class DataTransformer(IDataTransformer):
         retries = 0
         last_exception = None
 
-        while retries < self.MAX_RETRIES:
+        while retries < self.settings.MAX_RETRIES:
             try:
                 # Validate the input data structure
                 if not data or not isinstance(data, dict):
@@ -471,12 +516,21 @@ class DataTransformer(IDataTransformer):
                 # Extract and format language data from LinkedIn
                 languages = self.__format_languages(linkedin_data.get("languages", []))
 
+                # Process profile picture
+                profile_pic_url = linkedin_data.get("profilePic", "")
+                processed_profile_pic_url = await self._process_image_url(
+                    profile_pic_url
+                )
+                self.logger.debug(
+                    f"Processed profile picture URL: {processed_profile_pic_url}"
+                )
+
                 # Build profile data with safe defaults
                 profile_data = {
                     "username": linkedin_data.get("publicIdentifier", ""),
                     "firstName": linkedin_data.get("firstName", ""),
                     "lastName": linkedin_data.get("lastName", ""),
-                    "profilePictureUrl": linkedin_data.get("profilePic", ""),
+                    "profilePictureUrl": processed_profile_pic_url,
                     "jobTitle": linkedin_data.get("headline", ""),
                     "headline": linkedin_data.get("headline", ""),
                     "about": linkedin_data.get("about", ""),
@@ -487,7 +541,7 @@ class DataTransformer(IDataTransformer):
                     "experiences": [
                         exp
                         for exp in [
-                            self.__format_experience(exp)
+                            await self.__format_experience(exp)
                             for exp in linkedin_data.get("experiences", [])
                         ]
                         if exp is not None
@@ -495,7 +549,7 @@ class DataTransformer(IDataTransformer):
                     "education": [
                         edu
                         for edu in [
-                            self.__format_education(edu)
+                            await self.__format_education(edu)
                             for edu in linkedin_data.get("educations", [])
                         ]
                         if edu is not None
@@ -508,7 +562,7 @@ class DataTransformer(IDataTransformer):
                     "volunteering": [
                         vol
                         for vol in [
-                            self.__format_volunteering(vol)
+                            await self.__format_volunteering(vol)
                             for vol in linkedin_data.get("volunteerAndAwards", [])
                         ]
                         if vol is not None
@@ -516,7 +570,7 @@ class DataTransformer(IDataTransformer):
                     "projects": [
                         proj
                         for proj in [
-                            self.__format_project(proj)
+                            await self.__format_project(proj)
                             for proj in linkedin_data.get("projects", [])
                         ]
                         if proj is not None
@@ -536,12 +590,12 @@ class DataTransformer(IDataTransformer):
                 last_exception = e
                 retries += 1
                 self.logger.warn(
-                    f"Error transforming profile data (attempt {retries}/{self.MAX_RETRIES}): {str(e)}"
+                    f"Error transforming profile data (attempt {retries}/{self.settings.MAX_RETRIES}): {str(e)}"
                 )
 
-                if retries < self.MAX_RETRIES:
-                    time.sleep(self.RETRY_DELAY)
+                if retries < self.settings.MAX_RETRIES:
+                    time.sleep(self.settings.RETRY_DELAY_SECONDS)
                 else:
-                    error_msg = f"Failed to transform profile data after {self.MAX_RETRIES} attempts: {str(e)}"
+                    error_msg = f"Failed to transform profile data after {self.settings.MAX_RETRIES} attempts: {str(e)}"
                     self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
                     raise DataTransformerError(error_msg) from last_exception

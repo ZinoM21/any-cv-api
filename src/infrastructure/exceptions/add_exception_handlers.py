@@ -8,10 +8,11 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from src.core.domain.interfaces import ILogger
-from src.core.exceptions import UncaughtException
+from src.infrastructure.exceptions.exceptions import UncaughtException
 
 
 def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
+
     @app.exception_handler(HTTPException)
     async def custom_http_exception_handler(
         request: Request, exc: HTTPException, logger=logger

@@ -4,14 +4,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.config import settings
 from src.controllers import (
     auth_controller_v1,
     file_controller_v1,
     profile_controller_v1,
 )
-from src.deps import Database, logger
-from src.infrastructure.exception_handlers import add_exception_handlers
+from src.deps import Database, logger, settings
+from src.infrastructure.exceptions.add_exception_handlers import add_exception_handlers
 from src.infrastructure.middleware import AuthMiddleware
 
 

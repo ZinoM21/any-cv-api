@@ -3,8 +3,8 @@ from fastapi.exception_handlers import http_exception_handler
 from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.config import settings
-from src.core.exceptions import UnauthorizedHTTPException
+from src.deps import settings
+from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -26,7 +26,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         token = auth_header.split(" ")[1]
         try:
             payload = jwt.decode(
-                token, settings.nextauth_secret, algorithms=[settings.auth_algorithm]
+                token, settings.auth_secret, algorithms=[settings.auth_algorithm]
             )
 
             user_id = payload.get("sub")

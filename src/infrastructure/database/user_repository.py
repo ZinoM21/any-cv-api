@@ -3,9 +3,9 @@ from typing import List, Optional
 from beanie.operators import Or
 from pydantic import EmailStr
 
-from src.core.decorators import handle_exceptions
 from src.core.domain.interfaces import ILogger, IUserRepository
 from src.core.domain.models.user import User
+from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
 class UserRepository(IUserRepository):
@@ -31,4 +31,3 @@ class UserRepository(IUserRepository):
     @handle_exceptions()
     async def create(self, user: User) -> User:
         return await user.create()
-
