@@ -11,6 +11,7 @@ from src.core.domain.interfaces import (
     IRemoteDataSource,
 )
 from src.core.domain.models import UpdateProfile
+from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
 class ProfileService:
@@ -44,6 +45,7 @@ class ProfileService:
 
         return username
 
+    @handle_exceptions()
     async def get_profile_info(self, link: str) -> Dict:
         """Get profile information from cache or remote data source"""
         username = self.__extract_username(link)
@@ -63,6 +65,11 @@ class ProfileService:
         raw_profile_data = await self.remote_data_source.get_profile_data_by_username(
             username
         )
+        if not raw_profile_data:
+            raise HTTPException(
+                status_code=500,
+                detail="Could not fetch profile data from remote data source",
+            )
         self.logger.debug(
             f"Profile data fetched from remote Data Source for: {username}"
         )
@@ -93,6 +100,7 @@ class ProfileService:
             )
         )
 
+    @handle_exceptions()
     async def get_profile(self, username: str) -> Dict:
         profile = await self.profile_repository.find_by_username(username)
 
@@ -107,6 +115,7 @@ class ProfileService:
             )
         )
 
+    @handle_exceptions()
     async def update_profile(self, username: str, data: UpdateProfile) -> dict:
         """Update a user profile with the provided data"""
         profile = await self.profile_repository.find_by_username(username)

@@ -95,12 +95,15 @@ class SupabaseFileService(IFileService):
             )
 
         try:
-            file_extension = os.path.splitext(file_name)[1]
-            unique_filename = f"{uuid.uuid4()}{file_extension}"
+            # Filename
+            filename, file_ext = os.path.splitext(file_name)
+            if not file_ext:
+                file_ext = ".jpg"
+            filename = f"{filename or file_name}{file_ext}"
 
-            response = self.supabase.storage.from_(
+            response = self.supabase_service.storage.from_(
                 self.bucket_name
-            ).create_signed_upload_url(unique_filename)
+            ).create_signed_upload_url(filename)
 
             return SignedUrl(signed_url=response["signedUrl"])
 
