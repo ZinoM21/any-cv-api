@@ -6,7 +6,7 @@ from urllib.parse import unquote, urlparse
 
 import aiohttp
 from fastapi.exceptions import HTTPException
-from supabase import Client, create_client
+from supabase import Client, ClientOptions, create_client
 
 from src.config import Settings
 from src.core.domain.interfaces import IFileService, ILogger
@@ -27,6 +27,12 @@ class SupabaseFileService(IFileService):
         self.supabase_service: Client = create_client(
             self.settings.supabase_url,
             self.settings.supabase_secret_key,
+            # TODO: Remove this once authorization is implemented
+            ClientOptions(
+                headers={
+                    "x-upsert": "true",
+                }
+            ),
         )
         self.bucket_name = self.settings.supabase_bucket
 
@@ -44,7 +50,7 @@ class SupabaseFileService(IFileService):
         if file_type not in self.settings.ALLOWED_MIME_TYPES:
             return False
 
-        if file_size > self.settings.MAX_FILE_SIZE_BYTES:
+        if file_size > (self.settings.MAX_FILE_SIZE_MB * 1024 * 1024):
             return False
 
         return True
@@ -61,7 +67,6 @@ class SupabaseFileService(IFileService):
             Dict containing the signed URL and other metadata
         """
         try:
-            # Get signed URL from Supabase
             response = self.supabase_service.storage.from_(
                 self.bucket_name
             ).create_signed_url(file_path, expires_in=self.settings.EXPIRES_IN_SECONDS)
@@ -91,15 +96,13 @@ class SupabaseFileService(IFileService):
         if not is_valid:
             raise HTTPException(
                 status_code=400,
-                detail="Invalid file type or size exceeds the maximum allowed (10MB)",
+                detail=f"Invalid file type or size exceeds the maximum allowed ({self.settings.MAX_FILE_SIZE_MB}MB)",
             )
 
         try:
-            # Filename
+            # Double check filename with correct extension
             filename, file_ext = os.path.splitext(file_name)
-            if not file_ext:
-                file_ext = ".jpg"
-            filename = f"{filename or file_name}{file_ext}"
+            filename = f"{filename or file_name}{file_ext or mimetypes.guess_extension(file_type) or ''}"
 
             response = self.supabase_service.storage.from_(
                 self.bucket_name
@@ -125,18 +128,16 @@ class SupabaseFileService(IFileService):
             return None
 
         try:
+            # Mimetype
+            mimetype = mimetypes.guess_type(image_url)[0] or "image/jpeg"
+
             # Filename
             parsed_url = urlparse(image_url)
             path = unquote(parsed_url.path)
             base_filename = os.path.basename(path)
 
             filename, file_ext = os.path.splitext(base_filename)
-            if not file_ext:
-                file_ext = ".jpg"
-            filename = f"{filename or base_filename}{file_ext}"
-
-            # Mimetype
-            mimetype = mimetypes.guess_type(image_url)[0] or "image/jpeg"
+            filename = f"{filename or base_filename}{file_ext or mimetypes.guess_extension(mimetype) or ''}"
 
             # Download the image
             async with aiohttp.ClientSession() as session:
@@ -177,15 +178,19 @@ class SupabaseFileService(IFileService):
             )
             if not is_valid:
                 raise Exception(
-                    "Invalid file type or size exceeds the maximum allowed (10MB)",
+                    f"Invalid file type or size exceeds the maximum allowed ({self.settings.MAX_FILE_SIZE_MB}MB)",
                 )
+
+            # Double check filename with correct extension
+            mimetype = image_download.mimetype
+            filename, file_ext = os.path.splitext(image_download.filename)
+            filename = f"{filename or image_download.filename}{file_ext or mimetypes.guess_extension(mimetype) or ''}"
 
             # Upload / Upsert
             self.supabase_service.storage.from_(self.bucket_name).upload(
-                path=image_download.filename,
+                path=filename,
                 file=image_download.data,
                 file_options={
-                    "content-type": image_download.mimetype,
                     "upsert": "true",
                 },
             )

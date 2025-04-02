@@ -27,15 +27,13 @@ class Settings(BaseSettings):
     supabase_publishable_key: str
     supabase_secret_key: str
     supabase_bucket: str = "files"
-    MAX_FILE_SIZE_BYTES: int = 5 * 1024 * 1024  # 5MB
+    MAX_FILE_SIZE_MB: int = 5  # 5MB
     ALLOWED_MIME_TYPES: Set[str] = {
         "image/jpeg",
         "image/png",
         "image/gif",
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",  # docx
     }
-    EXPIRES_IN_SECONDS: int = 60 * 5  # 5 minutes
+    EXPIRES_IN_SECONDS: int = 60
 
     # Auth
     auth_secret: str
