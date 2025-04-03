@@ -1,6 +1,5 @@
 import mimetypes
 import os
-import uuid
 from typing import Optional
 from urllib.parse import unquote, urlparse
 
@@ -191,6 +190,7 @@ class SupabaseFileService(IFileService):
                 path=filename,
                 file=image_download.data,
                 file_options={
+                    "content-type": mimetype,
                     "upsert": "true",
                 },
             )
