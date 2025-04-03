@@ -1,6 +1,5 @@
-from typing import List, Optional
+from typing import Optional
 
-from beanie.operators import Or
 from pydantic import EmailStr
 
 from src.core.domain.interfaces import ILogger, IUserRepository
@@ -15,18 +14,6 @@ class UserRepository(IUserRepository):
     @handle_exceptions()
     async def find_by_email(self, email: EmailStr) -> Optional[User]:
         return await User.find_one(User.email == email)
-
-    @handle_exceptions()
-    async def find_by_username_or_email(
-        self, username: str, email: str
-    ) -> Optional[List[User]]:
-        return await User.find(
-            Or(User.username == username, User.email == email)
-        ).to_list()
-
-    @handle_exceptions()
-    async def find_by_username(self, username: str) -> Optional[User]:
-        return await User.find_one(User.username == username)
 
     @handle_exceptions()
     async def create(self, user: User) -> User:

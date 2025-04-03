@@ -59,7 +59,6 @@ class AuthService(IAuthService):
         data_to_encode = {
             "sub": str(user.id),
             "email": user.email,
-            "username": user.username,
         }
 
         if type == "refresh":
@@ -97,15 +96,6 @@ class AuthService(IAuthService):
 
     @handle_exceptions()
     async def register_user(self, user_data: UserCreate) -> UserResponse:
-        existing_username = await self.user_repository.find_by_username(
-            user_data.username
-        )
-        if existing_username:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered",
-            )
-
         existing_email = await self.user_repository.find_by_email(user_data.email)
         if existing_email:
             raise HTTPException(
@@ -134,13 +124,13 @@ class AuthService(IAuthService):
         except InvalidTokenError:
             raise UnauthorizedHTTPException(detail="Invalid refresh token")
 
-        username = payload.get("username")
-        if username is None:
+        email = payload.get("email")
+        if email is None:
             raise UnauthorizedHTTPException(
                 detail="Invalid refresh token",
             )
 
-        user = await self.user_repository.find_by_username(username)
+        user = await self.user_repository.find_by_email(email)
         if user is None:
             raise UnauthorizedHTTPException(detail="User not found")
 

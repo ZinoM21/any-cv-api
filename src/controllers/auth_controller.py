@@ -22,7 +22,7 @@ async def login_for_access_token(
     user = await auth_service.authenticate_user(user_data)
     if not user:
         raise UnauthorizedHTTPException(
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
         )
 
     return user
