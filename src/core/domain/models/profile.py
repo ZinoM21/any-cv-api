@@ -2,8 +2,10 @@ from datetime import datetime, timezone
 from typing import Annotated, List, Optional
 from uuid import UUID, uuid4
 
-from beanie import Document, Indexed
+from beanie import BackLink, Document, Indexed
 from pydantic import BaseModel, Field
+
+from .user import User
 
 
 class Position(BaseModel):
@@ -80,6 +82,7 @@ class Profile(Document):
     updated_at: Annotated[
         datetime, Field(default_factory=lambda: datetime.now(timezone.utc))
     ]
+    user: Optional[BackLink[User]] = None
 
     class Settings:
         name = "profiles"
