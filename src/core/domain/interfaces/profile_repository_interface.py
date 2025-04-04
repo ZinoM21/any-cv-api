@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.core.domain.models import Profile
+from src.core.domain.models import GuestProfile, Profile
 
 
 class IProfileRepository(ABC):
@@ -15,4 +15,18 @@ class IProfileRepository(ABC):
 
     @abstractmethod
     async def update(self, profile: Profile, new_data: dict) -> Profile:
+        pass
+
+
+class IProfileCacheRepository(ABC):
+    @abstractmethod
+    async def find_by_username(self, username: str) -> Optional[GuestProfile]:
+        pass
+
+    @abstractmethod
+    async def create(self, profile: GuestProfile) -> GuestProfile:
+        pass
+
+    @abstractmethod
+    async def update(self, profile: GuestProfile, new_data: dict) -> GuestProfile:
         pass

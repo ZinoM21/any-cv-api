@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
-from typing import Annotated, List, Optional
+from typing import TYPE_CHECKING, Annotated, List, Optional
 from uuid import UUID, uuid4
 
-from beanie import Document, Indexed, Link  # type: ignore
+from beanie import Document, Indexed, Link
 from pydantic import BaseModel, EmailStr, Field
 
-from .profile import Profile
+# Need to do this to avoid circular imports type error
+if TYPE_CHECKING:
+    from .profile import Profile
 
 
 class User(Document):
@@ -20,7 +22,7 @@ class User(Document):
     updated_at: Annotated[
         datetime, Field(default_factory=lambda: datetime.now(timezone.utc))
     ]
-    profiles: Optional[List[Link[Profile]]] = None
+    profiles: Optional[List[Link["Profile"]]] = []
 
     class Settings:
         name = "users"

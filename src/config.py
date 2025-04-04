@@ -42,13 +42,19 @@ class Settings(BaseSettings):
     auth_algorithm: str = "HS256"
     public_paths: List[str] = [
         "/healthz",
-        "/api/v1",
         "/api/v1/healthz",
-        "/api/v1/profile/healthz",
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh-access",
     ]
+    optional_auth_paths: List[str] = [
+        "/api/v1/profile/",
+    ]
+
+    @property
+    def all_public_paths(self) -> List[str]:
+        """All paths that shouldn't return 401 if no auth token is provided"""
+        return self.public_paths + self.optional_auth_paths
 
     model_config = SettingsConfigDict(env_file=".env")
 

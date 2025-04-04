@@ -6,9 +6,8 @@ from urllib.parse import urlparse
 from dateutil import parser as date_parser
 
 from src.config import Settings
-from src.core.domain.interfaces import IDataTransformer, IFileService
-from src.core.domain.interfaces.logger_interface import ILogger
-from src.core.domain.models.profile import (
+from src.core.domain.interfaces import IDataTransformer, IFileService, ILogger
+from src.core.domain.models import (
     Education,
     Experience,
     Position,

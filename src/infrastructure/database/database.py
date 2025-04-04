@@ -15,6 +15,7 @@ class Database:
         try:
             cls.client = AsyncIOMotorClient(
                 settings.mongodb_url,
+                uuidRepresentation="standard",
                 serverSelectionTimeoutMS=5000,
                 connectTimeoutMS=5000,
             )
