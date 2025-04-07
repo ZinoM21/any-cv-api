@@ -54,17 +54,39 @@ class SupabaseFileService(IFileService):
 
         return True
 
+    def verify_path_access(self, path: str, user_id: str) -> bool:
+        """
+        Verify that the path is accessible by the user.
+        Allow access only to the user's directory or files.
+        Format of user paths should be: {user_id}/{filename}
+
+        Args:
+            path: Path to verify
+            user_id: ID of the user attempting access
+
+        Returns:
+            True if access is allowed, False otherwise
+        """
+        return path.startswith(f"{user_id}/") or path == user_id
+
     @handle_exceptions()
-    async def generate_signed_url(self, file_path: str) -> SignedUrl:
+    async def generate_signed_url(self, file_path: str, user_id: str) -> SignedUrl:
         """
         Generate a signed URL for file upload
 
         Args:
             file_path: Path of the file in storage
+            user_id: ID of the user requesting the signed URL
 
         Returns:
             Dict containing the signed URL and other metadata
         """
+        if not self.verify_path_access(file_path, user_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to access this file",
+            )
+
         try:
             response = self.supabase_service.storage.from_(
                 self.bucket_name
@@ -77,7 +99,7 @@ class SupabaseFileService(IFileService):
 
     @handle_exceptions()
     async def generate_signed_upload_url(
-        self, file_name: str, file_type: str, file_size: int
+        self, file_name: str, file_type: str, file_size: int, user_id: str
     ) -> SignedUrl:
         """
         Generate a signed URL for file upload
@@ -86,6 +108,7 @@ class SupabaseFileService(IFileService):
             file_name: Original name of the file
             file_type: MIME type of the file
             file_size: Size of the file in bytes
+            user_id: ID of the user requesting the signed URL
 
         Returns:
             Dict containing the signed URL and upload details
@@ -99,9 +122,15 @@ class SupabaseFileService(IFileService):
             )
 
         try:
-            # Double check filename with correct extension
+            # Double check filename with correct extension & add user_id prefix
             filename, file_ext = os.path.splitext(file_name)
-            filename = f"{filename or file_name}{file_ext or mimetypes.guess_extension(file_type) or ''}"
+            filename = f"{user_id}/{filename or file_name}{file_ext or mimetypes.guess_extension(file_type) or ''}"
+
+            if not self.verify_path_access(filename, user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You do not have permission to upload to this location",
+                )
 
             response = self.supabase_service.storage.from_(
                 self.bucket_name
@@ -159,12 +188,15 @@ class SupabaseFileService(IFileService):
             raise Exception(f"Error downloading remote image: {str(e)}")
 
     @handle_exceptions()
-    async def upload_image(self, image_download: ImageDownload) -> Optional[str]:
+    async def upload_image(
+        self, image_download: ImageDownload, path_prefix: str = ""
+    ) -> Optional[str]:
         """
         Upload an image to Supabase storage
 
         Args:
             image_download: The image download with data in bytes, filename and mimetype
+            path_prefix: Optional directory prefix to store the file (e.g. user ID)
 
         Returns:
             The file path in Supabase storage or None if failed
@@ -185,6 +217,9 @@ class SupabaseFileService(IFileService):
             filename, file_ext = os.path.splitext(image_download.filename)
             filename = f"{filename or image_download.filename}{file_ext or mimetypes.guess_extension(mimetype) or ''}"
 
+            # Add path prefix if provided
+            filename = f"{path_prefix}/{filename}" if path_prefix else filename
+
             # Upload / Upsert
             self.supabase_service.storage.from_(self.bucket_name).upload(
                 path=filename,
@@ -195,8 +230,7 @@ class SupabaseFileService(IFileService):
                 },
             )
 
-            return image_download.filename
+            return filename
 
         except Exception as e:
             raise Exception(f"Error uploading remote image: {str(e)}")
-

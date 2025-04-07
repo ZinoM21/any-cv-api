@@ -1,4 +1,4 @@
-from typing import List, Set
+from typing import Set
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -40,19 +40,19 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_minutes: int = 60 * 24 * 7
     auth_algorithm: str = "HS256"
-    public_paths: List[str] = [
+    public_paths: list[str] = [
         "/healthz",
         "/api/v1/healthz",
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh-access",
     ]
-    optional_auth_paths: List[str] = [
+    optional_auth_paths: list[str] = [
         "/api/v1/profile/",
     ]
 
     @property
-    def all_public_paths(self) -> List[str]:
+    def all_public_paths(self) -> list[str]:
         """All paths that shouldn't return 401 if no auth token is provided"""
         return self.public_paths + self.optional_auth_paths
 

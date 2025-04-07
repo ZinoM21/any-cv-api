@@ -145,7 +145,7 @@ async def get_current_user(
     if not user_id or not isinstance(user_id, str):
         raise UnauthorizedHTTPException(detail="Not authenticated")
 
-    user = await user_repository.find_by_id(user_id)
+    user = user_repository.find_by_id(user_id)
 
     if not user:
         raise UnauthorizedHTTPException(detail="Invalid authentication credentials")
@@ -171,7 +171,7 @@ async def get_optional_current_user(
     if not user_id:
         return None
 
-    return await user_repository.find_by_id(user_id)
+    return user_repository.find_by_id(user_id)
 
 
 OptionalCurrentUserDep = Annotated[Optional[User], Depends(get_optional_current_user)]

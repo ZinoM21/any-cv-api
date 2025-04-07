@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import UUID
 
 import jwt
 from fastapi import HTTPException, status
@@ -7,15 +8,15 @@ from jwt import ExpiredSignatureError, InvalidTokenError
 from passlib.context import CryptContext
 
 from src.config import Settings
-from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
-from src.core.domain.models.user import (
+from src.core.domain.dtos import (
     AccessResponse,
     TokensResponse,
-    User,
     UserCreate,
     UserLogin,
     UserResponse,
 )
+from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
+from src.core.domain.models import User
 from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
 from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
@@ -79,14 +80,14 @@ class AuthService(IAuthService):
 
     @handle_exceptions()
     async def authenticate_user(self, request_data: UserLogin) -> TokensResponse:
-        user = await self.user_repository.find_by_email(request_data.email)
+        user = self.user_repository.find_by_email(request_data.email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No user with this email",
             )
 
-        if not self.verify_password(request_data.password, user.pw_hash):
+        if not self.verify_password(request_data.password, str(user.pw_hash)):
             raise UnauthorizedHTTPException(
                 detail="Incorrect password",
             )
@@ -96,7 +97,7 @@ class AuthService(IAuthService):
 
     @handle_exceptions()
     async def register_user(self, user_data: UserCreate) -> UserResponse:
-        existing_email = await self.user_repository.find_by_email(user_data.email)
+        existing_email = self.user_repository.find_by_email(user_data.email)
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -105,15 +106,19 @@ class AuthService(IAuthService):
 
         hashed_password = self.get_password_hash(user_data.password)
 
-        new_user = await self.user_repository.create(
-            User(
-                pw_hash=hashed_password,
+        new_user = self.user_repository.create(
+            {
+                "pw_hash": hashed_password,
                 **user_data.model_dump(exclude={"password"}),
-            )
+            }
         )
 
-        user_response = new_user.model_dump(exclude={"pw_hash"})
-        return UserResponse(**user_response)
+        return UserResponse(
+            id=UUID(str(new_user.id)),
+            email=str(new_user.email),
+            firstName=str(new_user.firstName),
+            lastName=str(new_user.lastName),
+        )
 
     @handle_exceptions()
     async def refresh_token(self, refresh_token: str) -> AccessResponse:
@@ -130,7 +135,7 @@ class AuthService(IAuthService):
                 detail="Invalid refresh token",
             )
 
-        user = await self.user_repository.find_by_email(email)
+        user = self.user_repository.find_by_email(email)
         if user is None:
             raise UnauthorizedHTTPException(detail="User not found")
 

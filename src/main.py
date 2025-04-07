@@ -10,7 +10,7 @@ from src.controllers import (
     profile_controller_v1,
 )
 from src.deps import Database, logger, settings
-from src.infrastructure.exceptions.add_exception_handlers import add_exception_handlers
+from src.infrastructure.exceptions import add_exception_handlers
 from src.infrastructure.middleware import AuthMiddleware
 
 

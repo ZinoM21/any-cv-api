@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from src.core.domain.models import UpdateProfile
+from src.core.domain.dtos import UpdateProfile
 from src.deps import OptionalCurrentUserDep, ProfileServiceDep
 from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 

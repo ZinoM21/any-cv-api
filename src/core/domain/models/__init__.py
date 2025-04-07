@@ -5,12 +5,8 @@ from .profile import (
     Position,
     Profile,
     Project,
-    UpdateProfile,
     VolunteeringExperience,
 )
 from .user import User
-
-# All models to instantiate on load
-__beanie_models__ = [Profile, User, GuestProfile]
 
 __all__ = ["Profile", "User", "GuestProfile"]

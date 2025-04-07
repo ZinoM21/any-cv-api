@@ -1,6 +1,6 @@
 import time
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from dateutil import parser as date_parser
@@ -46,7 +46,7 @@ class DataTransformer(IDataTransformer):
         """Safely retrieve a value from a dictionary, returning default if key doesn't exist."""
         return data.get(key, default)
 
-    def _safe_extract_text(self, items: List[Dict[str, Any]]) -> str:
+    def _safe_extract_text(self, items: list[Dict[str, Any]]) -> str:
         """Safely extract text from a list of components."""
         if not items or not isinstance(items, list):
             return ""
@@ -61,21 +61,33 @@ class DataTransformer(IDataTransformer):
                 text_parts.append(item["text"])
         return " ".join(text_parts)
 
-    async def _process_image_url(self, image_url: str) -> str | None:
+    async def _process_image_url(
+        self,
+        image_url: str,
+        is_authenticated: bool = True,
+        user_id: Optional[str] = None,
+    ) -> str | None:
         """
         Process an image URL - if it's a LinkedIn URL, download and upload to our storage
+        For unauthenticated users, no image processing is performed.
+        For authenticated users, images are stored in a folder with the user's ID.
 
         Args:
             image_url: The image URL to process
+            is_authenticated: Whether the user is authenticated
+            user_id: The ID of the authenticated user (if available)
 
         Returns:
-            The file path in storage (not the public URL)
+            The file path in storage (not the public URL) or None
         """
         if not image_url or not self.file_service:
             return None
 
-        try:
+        # Skip image processing for unauthenticated users
+        if not is_authenticated:
+            return None
 
+        try:
             parsed_url = urlparse(image_url)
 
             if parsed_url.netloc in self.settings.LINKEDIN_MEDIA_DOMAINS:
@@ -83,7 +95,11 @@ class DataTransformer(IDataTransformer):
                     image_url
                 )
                 if image_download:
-                    file_path = await self.file_service.upload_image(image_download)
+                    # Use user_id as path prefix for authenticated users
+                    path_prefix = user_id if user_id else ""
+                    file_path = await self.file_service.upload_image(
+                        image_download, path_prefix
+                    )
                     return file_path
 
         except Exception as e:
@@ -137,7 +153,9 @@ class DataTransformer(IDataTransformer):
             )
             return "", ""
 
-    async def __format_experience(self, exp: dict) -> Optional[Experience]:
+    async def __format_experience(
+        self, exp: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Optional[Experience]:
         """Transforms raw experience data into an Experience object.
 
         Handles both single positions and multiple positions under one company.
@@ -154,7 +172,9 @@ class DataTransformer(IDataTransformer):
 
             # Process company logo
             company_logo_url = exp.get("logo", "")
-            processed_logo_url = await self._process_image_url(company_logo_url)
+            processed_logo_url = await self._process_image_url(
+                company_logo_url, is_authenticated, user_id
+            )
 
             # Handle experiences with multiple positions (breakdown=true)
             if exp.get("breakdown"):
@@ -266,7 +286,9 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
-    async def __format_education(self, edu: dict) -> Optional[Education]:
+    async def __format_education(
+        self, edu: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Optional[Education]:
         """Transforms raw education data into an Education object.
 
         Returns None if critical data is missing or malformed.
@@ -282,7 +304,9 @@ class DataTransformer(IDataTransformer):
 
             # Process school logo
             school_logo_url = edu.get("logo", "")
-            processed_logo_url = await self._process_image_url(school_logo_url)
+            processed_logo_url = await self._process_image_url(
+                school_logo_url, is_authenticated, user_id
+            )
 
             # Extract date info
             start_date, end_date, _ = self.__extract_date_info(edu.get("caption", ""))
@@ -330,7 +354,7 @@ class DataTransformer(IDataTransformer):
             return None
 
     async def __format_volunteering(
-        self, vol: dict
+        self, vol: dict, is_authenticated: bool = True, user_id: Optional[str] = None
     ) -> Optional[VolunteeringExperience]:
         """Transforms raw volunteering data into a VolunteeringExperience object.
 
@@ -349,7 +373,9 @@ class DataTransformer(IDataTransformer):
 
             # Process organization logo
             org_logo_url = vol.get("logo", "")
-            processed_logo_url = await self._process_image_url(org_logo_url)
+            processed_logo_url = await self._process_image_url(
+                org_logo_url, is_authenticated, user_id
+            )
 
             start_date, end_date, _ = self.__extract_date_info(vol.get("caption", ""))
 
@@ -377,7 +403,12 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
-    async def __format_project(self, project_data: dict) -> Optional[Project]:
+    async def __format_project(
+        self,
+        project_data: dict,
+        is_authenticated: bool = True,
+        user_id: Optional[str] = None,
+    ) -> Optional[Project]:
         """Transforms raw project data into a Project object.
 
         Returns None if critical data is missing or malformed.
@@ -442,7 +473,7 @@ class DataTransformer(IDataTransformer):
             )
             return None
 
-    def __format_languages(self, languages_data: List[dict]) -> List[str]:
+    def __format_languages(self, languages_data: list[dict]) -> list[str]:
         """Transforms raw language data into a list of formatted language strings.
 
         Returns an empty list if no valid language entries are found.
@@ -470,7 +501,9 @@ class DataTransformer(IDataTransformer):
 
         return formatted_languages
 
-    async def transform_profile_data(self, data: dict) -> Profile | None:
+    async def transform_profile_data(
+        self, data: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Profile | None:
         """Transform LinkedIn API response to match frontend types.
 
         Implements retry logic for transient failures and comprehensive error handling.
@@ -478,6 +511,8 @@ class DataTransformer(IDataTransformer):
 
         Args:
             data: The raw LinkedIn API response.
+            is_authenticated: Whether the user is authenticated
+            user_id: The ID of the authenticated user (if available)
 
         Returns:
             A Profile object containing the transformed data.
@@ -518,7 +553,7 @@ class DataTransformer(IDataTransformer):
                 # Process profile picture
                 profile_pic_url = linkedin_data.get("profilePic", "")
                 processed_profile_pic_url = await self._process_image_url(
-                    profile_pic_url
+                    profile_pic_url, is_authenticated, user_id
                 )
                 self.logger.debug(
                     f"Processed profile picture URL: {processed_profile_pic_url}"
@@ -540,7 +575,9 @@ class DataTransformer(IDataTransformer):
                     "experiences": [
                         exp
                         for exp in [
-                            await self.__format_experience(exp)
+                            await self.__format_experience(
+                                exp, is_authenticated, user_id
+                            )
                             for exp in linkedin_data.get("experiences", [])
                         ]
                         if exp is not None
@@ -548,7 +585,9 @@ class DataTransformer(IDataTransformer):
                     "education": [
                         edu
                         for edu in [
-                            await self.__format_education(edu)
+                            await self.__format_education(
+                                edu, is_authenticated, user_id
+                            )
                             for edu in linkedin_data.get("educations", [])
                         ]
                         if edu is not None
@@ -561,7 +600,9 @@ class DataTransformer(IDataTransformer):
                     "volunteering": [
                         vol
                         for vol in [
-                            await self.__format_volunteering(vol)
+                            await self.__format_volunteering(
+                                vol, is_authenticated, user_id
+                            )
                             for vol in linkedin_data.get("volunteerAndAwards", [])
                         ]
                         if vol is not None
@@ -569,7 +610,7 @@ class DataTransformer(IDataTransformer):
                     "projects": [
                         proj
                         for proj in [
-                            await self.__format_project(proj)
+                            await self.__format_project(proj, is_authenticated, user_id)
                             for proj in linkedin_data.get("projects", [])
                         ]
                         if proj is not None

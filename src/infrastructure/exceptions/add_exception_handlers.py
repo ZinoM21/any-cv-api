@@ -8,10 +8,20 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from src.core.domain.interfaces import ILogger
-from src.infrastructure.exceptions.exceptions import UncaughtException
+
+from .exceptions import (
+    UnauthorizedHTTPException,
+    UncaughtException,
+)
 
 
 def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
+    @app.exception_handler(UnauthorizedHTTPException)
+    async def custom_unauth_http_exception_handler(
+        request: Request, exc: UnauthorizedHTTPException, logger=logger
+    ):
+        logger.error(f"Unauthorized HTTPException: {exc}")
+        return await http_exception_handler(request, exc)
 
     @app.exception_handler(HTTPException)
     async def custom_http_exception_handler(

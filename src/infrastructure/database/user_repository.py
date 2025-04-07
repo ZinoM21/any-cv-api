@@ -1,7 +1,6 @@
 from typing import Optional
-from uuid import UUID
 
-from beanie import WriteRules
+from mongoengine import DoesNotExist
 from pydantic import EmailStr
 
 from src.core.domain.interfaces import ILogger, IUserRepository
@@ -14,18 +13,29 @@ class UserRepository(IUserRepository):
         self.logger = logger
 
     @handle_exceptions()
-    async def find_by_email(self, email: EmailStr) -> Optional[User]:
-        return await User.find_one(User.email == email)
+    def find_by_email(self, email: EmailStr) -> Optional[User]:
+        try:
+            return User.objects.get(email=email)
+        except DoesNotExist:
+            return None
 
     @handle_exceptions()
-    async def find_by_id(self, user_id: str) -> Optional[User]:
-        return await User.get(UUID(user_id))
+    def find_by_id(self, user_id: str) -> Optional[User]:
+        try:
+            return User.objects.get(id=user_id)
+        except DoesNotExist:
+            return None
 
     @handle_exceptions()
-    async def create(self, user: User) -> User:
-        return await user.create()
+    def create(self, user: dict) -> User:
+        return User(**user).save()
 
     @handle_exceptions()
-    async def append_profile_to_user(self, profile: Profile, user: User) -> User:
-        user.profiles = [profile]
-        return await user.save(link_rule=WriteRules.WRITE)
+    def append_profile_to_user(self, profile: Profile, user: User) -> User:
+        try:
+            self.logger.debug(f"Appending profile to user: {profile}")
+            User.objects(id=user.id).update_one(push__profiles=profile)
+            return user.save()
+        except Exception as e:
+            self.logger.error(f"Error appending profile to user: {e}")
+            raise e
