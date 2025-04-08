@@ -10,6 +10,8 @@ from mongoengine import (
     UUIDField,
 )
 
+from src.config import settings
+
 from .profile import Education, Experience, Project, VolunteeringExperience
 
 
@@ -36,5 +38,10 @@ class GuestProfile(Document):
 
     meta = {
         "collection": "guest_profiles",
-        "indexes": [{"fields": ["created_at"], "expireAfterSeconds": 3600}],
+        "indexes": [
+            {
+                "fields": ["created_at"],
+                "expireAfterSeconds": settings.cache_guest_profile_sec,
+            }
+        ],
     }

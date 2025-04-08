@@ -1,8 +1,6 @@
 from .profile import UpdateProfile
+from .token import AccessResponse, RefreshRequest, TokensResponse
 from .user import (
-    AccessResponse,
-    RefreshRequest,
-    TokensResponse,
     UserCreate,
     UserLogin,
     UserResponse,

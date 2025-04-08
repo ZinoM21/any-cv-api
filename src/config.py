@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     }
     EXPIRES_IN_SECONDS: int = 60
 
+    # Cache
+    cache_guest_profile_sec: int = 60 * 60 * 24 * 7  # 1 week
+
     # Auth
     auth_secret: str
     access_token_expire_minutes: int = 15
