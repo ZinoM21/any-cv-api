@@ -13,7 +13,7 @@ from src.core.domain.interfaces import (
     IUserRepository,
 )
 from src.core.domain.models import GuestProfile, Profile, User
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import handle_exceptions
 
 
 class ProfileService:
@@ -90,6 +90,14 @@ class ProfileService:
             )
 
         return profile
+
+    @handle_exceptions()
+    def _user_has_access_to_profile(self, user: User, profile: Profile) -> bool:
+        if user:
+            for p in user.profiles:
+                if p.id == profile.id:
+                    return True
+        return False
 
     @handle_exceptions()
     async def _create_profile(self, username: str, user: User) -> dict:
@@ -180,14 +188,24 @@ class ProfileService:
         """Get a profile by username from database"""
         if user:
             profile = self.profile_repository.find_by_username(username)
+            if not profile:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Profile not found for username: {username}",
+                )
+            if not self._user_has_access_to_profile(user, profile):
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"User does not have access to profile: {username}",
+                )
 
         else:
             profile = self.profile_cache_repository.find_by_username(username)
-
-        if not profile:
-            raise HTTPException(
-                status_code=404, detail=f"Profile not found for username: {username}"
-            )
+            if not profile:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Profile not found for username: {username}",
+                )
 
         return profile.to_mongo().to_dict()
 
@@ -209,6 +227,11 @@ class ProfileService:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Profile not found for username: {username}",
+                )
+            if not self._user_has_access_to_profile(user, profile):
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"User does not have access to profile: {username}",
                 )
 
             updated_profile = self.profile_repository.update(profile, data_to_update)
