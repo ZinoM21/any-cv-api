@@ -92,7 +92,7 @@ class SupabaseFileService(IFileService):
                 self.bucket_name
             ).create_signed_url(file_path, expires_in=self.settings.EXPIRES_IN_SECONDS)
 
-            return SignedUrl(signed_url=response["signedUrl"])
+            return SignedUrl(signed_url=response["signedUrl"], path=file_path)
 
         except Exception as e:
             raise Exception(f"Error generating signed URL: {str(e)}")
@@ -136,7 +136,7 @@ class SupabaseFileService(IFileService):
                 self.bucket_name
             ).create_signed_upload_url(filename)
 
-            return SignedUrl(signed_url=response["signedUrl"])
+            return SignedUrl(signed_url=response["signedUrl"], path=response["path"])
 
         except Exception as e:
             raise Exception(f"Error generating signed URL: {str(e)}")
