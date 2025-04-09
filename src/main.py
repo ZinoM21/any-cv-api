@@ -41,6 +41,7 @@ app = FastAPI(
 
 
 # Middleware
+app.add_middleware(AuthMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],
@@ -49,7 +50,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(AuthMiddleware)
 
 # Exception Handlers
 add_exception_handlers(app, logger)
