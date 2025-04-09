@@ -25,11 +25,12 @@ class ProfileCacheRepository(IProfileCacheRepository):
 
     @handle_exceptions()
     def update(self, guest_profile: GuestProfile, new_data: dict) -> GuestProfile:
-        # Set the updated_at field to current timestamp
         new_data["updated_at"] = datetime.now(timezone.utc)
 
-        # Update the document and return the updated version
-        return guest_profile.update(**new_data)
+        for key, value in new_data.items():
+            setattr(guest_profile, key, value)
+
+        return guest_profile.save()
 
     @handle_exceptions()
     def delete(self, guest_profile: GuestProfile) -> None:
