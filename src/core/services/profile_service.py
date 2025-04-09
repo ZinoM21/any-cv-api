@@ -250,3 +250,64 @@ class ProfileService:
             )
 
         return updated_profile.to_mongo().to_dict()
+
+    @handle_exceptions()
+    async def transfer_guest_profile_to_user(self, username: str, user: User) -> dict:
+        """
+        Transfer a guest profile to a user profile after sign-in.
+        1. Find the guest profile
+        2. Create a new Profile entry
+        3. Link it to the user
+        4. Delete the guest profile
+        5. Return the new profile
+        """
+        # Check if guest profile exists
+        guest_profile = self.profile_cache_repository.find_by_username(username)
+        if not guest_profile:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Guest profile not found for username: {username}",
+            )
+
+        self.logger.debug(f"Found guest profile for username: {username}")
+
+        # Check if user already has this profile
+        existing_profile = self.profile_repository.find_by_username(username)
+        if existing_profile:
+            # If profile already exists, check if user has access
+            if self._user_has_access_to_profile(user, existing_profile):
+                self.logger.debug(f"User already has access to profile: {username}")
+                # User already has this profile, delete the guest profile
+                self.profile_cache_repository.delete(guest_profile)
+                return existing_profile.to_mongo().to_dict()
+
+        # Create the new profile from the guest profile
+        new_profile = Profile(
+            username=guest_profile.username,
+            firstName=guest_profile.firstName,
+            lastName=guest_profile.lastName,
+            profilePictureUrl=guest_profile.profilePictureUrl,
+            jobTitle=guest_profile.jobTitle,
+            headline=guest_profile.headline,
+            about=guest_profile.about,
+            email=guest_profile.email,
+            phone=guest_profile.phone,
+            location=guest_profile.location,
+            languages=guest_profile.languages,
+            experiences=guest_profile.experiences,
+            education=guest_profile.education,
+            skills=guest_profile.skills,
+            volunteering=guest_profile.volunteering,
+            projects=guest_profile.projects,
+        )
+        profile = self.profile_repository.create(new_profile)
+
+        # Link profile to user
+        self.user_repository.append_profile_to_user(profile, user)
+        self.logger.debug(f"Profile linked to user for username: {username}")
+
+        # Delete the guest profile
+        self.profile_cache_repository.delete(guest_profile)
+        self.logger.debug(f"Guest profile deleted for username: {username}")
+
+        return profile.to_mongo().to_dict()

@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.core.domain.dtos import UpdateProfile
-from src.deps import OptionalCurrentUserDep, ProfileServiceDep
+from src.deps import CurrentUserDep, OptionalCurrentUserDep, ProfileServiceDep
 from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
@@ -47,3 +47,18 @@ async def update_profile(
     user: OptionalCurrentUserDep,
 ):
     return await profile_service.update_profile(username, profile_data, user)
+
+
+@profile_controller_v1.get("/{username}/transfer")
+@handle_exceptions()
+async def transfer_guest_profile(
+    username: str,
+    profile_service: ProfileServiceDep,
+    user: CurrentUserDep,
+):
+    """
+    Transfer a guest profile to an authenticated user's profile.
+    This endpoint should be called after a user signs in or signs up.
+    Requires authentication.
+    """
+    return await profile_service.transfer_guest_profile_to_user(username, user)

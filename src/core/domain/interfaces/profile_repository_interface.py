@@ -30,3 +30,7 @@ class IProfileCacheRepository(ABC):
     @abstractmethod
     def update(self, guest_profile: GuestProfile, new_data: dict) -> GuestProfile:
         pass
+
+    @abstractmethod
+    def delete(self, guest_profile: GuestProfile) -> None:
+        pass

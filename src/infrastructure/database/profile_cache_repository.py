@@ -30,3 +30,8 @@ class ProfileCacheRepository(IProfileCacheRepository):
 
         # Update the document and return the updated version
         return guest_profile.update(**new_data)
+
+    @handle_exceptions()
+    def delete(self, guest_profile: GuestProfile) -> None:
+        guest_profile.save()
+        guest_profile.delete()
