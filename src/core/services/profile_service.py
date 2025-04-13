@@ -94,7 +94,7 @@ class ProfileService:
     @handle_exceptions()
     def _user_has_access_to_profile(self, user: User, profile: Profile) -> bool:
         if user:
-            for p in user.profiles:
+            for p in user.profiles:  # type: ignore
                 if p.id == profile.id:
                     return True
         return False
@@ -210,6 +210,23 @@ class ProfileService:
         return profile.to_mongo().to_dict()
 
     @handle_exceptions()
+    async def get_published_profiles(self) -> list[dict]:
+        """Get all published profiles"""
+        profiles = self.profile_repository.find_published_profiles()
+        return [profile.to_mongo().to_dict() for profile in profiles]
+
+    @handle_exceptions()
+    async def get_published_profile(self, username: str) -> dict:
+        """Get a published profile"""
+        profile = self.profile_repository.find_published_by_username(username)
+        if not profile:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Profile not found for username: {username}",
+            )
+        return profile.to_mongo().to_dict()
+
+    @handle_exceptions()
     async def update_profile(
         self, username: str, data: UpdateProfile, user: Optional[User] = None
     ) -> dict:
@@ -218,7 +235,9 @@ class ProfileService:
         Updates guest_profile document if user is not authenticated.
         """
         data_to_update = data.model_dump(
+            mode="json",
             exclude_unset=True,
+            exclude_none=True,
         )
 
         if user:

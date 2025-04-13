@@ -8,5 +8,5 @@ class ImageDownload(BaseModel):
 
 
 class SignedUrl(BaseModel):
-    signed_url: str
+    url: str
     path: str

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 
 class PositionUpdate(BaseModel):
@@ -16,14 +16,14 @@ class PositionUpdate(BaseModel):
 
 class ExperienceUpdate(BaseModel):
     company: str
-    companyProfileUrl: Optional[HttpUrl] = None
+    companyProfileUrl: Optional[str] = None
     companyLogoUrl: Optional[str] = None
     positions: List[PositionUpdate]
 
 
 class EducationUpdate(BaseModel):
     school: str
-    schoolProfileUrl: Optional[HttpUrl] = None
+    schoolProfileUrl: Optional[str] = None
     schoolPictureUrl: Optional[str] = None
     degree: str
     fieldOfStudy: Optional[str] = None
@@ -37,7 +37,7 @@ class EducationUpdate(BaseModel):
 class VolunteeringExperienceUpdate(BaseModel):
     role: str
     organization: str
-    organizationProfileUrl: Optional[HttpUrl] = None
+    organizationProfileUrl: Optional[str] = None
     organizationLogoUrl: Optional[str] = None
     startDate: datetime
     endDate: Optional[datetime] = None
@@ -52,6 +52,11 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     url: Optional[str] = None
     associatedWith: Optional[str] = None
+
+
+class PublishingOptionsUpdate(BaseModel):
+    darkMode: Optional[bool] = None
+    templateId: Optional[str] = None
 
 
 class UpdateProfile(BaseModel):
@@ -70,3 +75,4 @@ class UpdateProfile(BaseModel):
     skills: Optional[List[str]] = None
     volunteering: Optional[List[VolunteeringExperienceUpdate]] = None
     projects: Optional[List[ProjectUpdate]] = None
+    publishingOptions: Optional[PublishingOptionsUpdate] = None

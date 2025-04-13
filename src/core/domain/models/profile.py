@@ -2,13 +2,14 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from mongoengine import (
+    BooleanField,
     DateTimeField,
     Document,
     EmbeddedDocument,
+    EmbeddedDocumentField,
     EmbeddedDocumentListField,
     ListField,
     StringField,
-    URLField,
     UUIDField,
 )
 
@@ -25,14 +26,14 @@ class Position(EmbeddedDocument):
 
 class Experience(EmbeddedDocument):
     company = StringField(max_length=255, required=True)
-    companyProfileUrl = URLField()
+    companyProfileUrl = StringField(max_length=255)
     companyLogoUrl = StringField(max_length=255)
     positions = EmbeddedDocumentListField(Position, required=True)
 
 
 class Education(EmbeddedDocument):
     school = StringField(max_length=255, required=True)
-    schoolProfileUrl = URLField()
+    schoolProfileUrl = StringField(max_length=255)
     schoolPictureUrl = StringField(max_length=255)
     degree = StringField(max_length=255, required=True)
     fieldOfStudy = StringField(max_length=255)
@@ -46,7 +47,7 @@ class Education(EmbeddedDocument):
 class VolunteeringExperience(EmbeddedDocument):
     role = StringField(required=True)
     organization = StringField(required=True)
-    organizationProfileUrl = URLField()
+    organizationProfileUrl = StringField(max_length=255)
     organizationLogoUrl = StringField(max_length=255)
     startDate = DateTimeField(required=True)
     endDate = DateTimeField()
@@ -61,6 +62,11 @@ class Project(EmbeddedDocument):
     description = StringField()
     url = StringField(max_length=255)
     associatedWith = StringField(max_length=255)
+
+
+class PublishingOptions(EmbeddedDocument):
+    darkMode = BooleanField(default=False)
+    templateId = StringField(max_length=255)
 
 
 class Profile(Document):
@@ -81,6 +87,7 @@ class Profile(Document):
     skills = ListField(StringField(max_length=255))
     volunteering = EmbeddedDocumentListField(VolunteeringExperience)
     projects = EmbeddedDocumentListField(Project)
+    publishingOptions = EmbeddedDocumentField(PublishingOptions)
     created_at = DateTimeField(default=datetime.now(timezone.utc))
     updated_at = DateTimeField(default=datetime.now(timezone.utc))
     # user = ReferenceField(User, reverse_delete_rule=NULLIFY)

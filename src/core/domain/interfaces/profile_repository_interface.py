@@ -17,6 +17,14 @@ class IProfileRepository(ABC):
     def update(self, profile: Profile, new_data: dict) -> Profile:
         pass
 
+    @abstractmethod
+    def find_published_profiles(self) -> list[Profile]:
+        pass
+
+    @abstractmethod
+    def find_published_by_username(self, username: str) -> Optional[Profile]:
+        pass
+
 
 class IProfileCacheRepository(ABC):
     @abstractmethod

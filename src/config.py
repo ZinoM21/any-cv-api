@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     public_paths: list[str] = [
         "/healthz",
         "/api/v1/healthz",
+        "/api/v1/profile/published",
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh-access",

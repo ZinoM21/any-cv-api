@@ -2,7 +2,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.core.domain.dtos import UpdateProfile
-from src.deps import CurrentUserDep, OptionalCurrentUserDep, ProfileServiceDep
+from src.deps import (
+    CurrentUserDep,
+    OptionalCurrentUserDep,
+    ProfileServiceDep,
+)
 from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
@@ -16,6 +20,31 @@ profile_controller_v1 = APIRouter(prefix="/v1/profile", tags=["profile"])
 @profile_controller_v1.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+
+
+@profile_controller_v1.get("/published")
+@handle_exceptions()
+async def get_published_profiles(
+    profile_service: ProfileServiceDep,
+):
+    """
+    Get all published profiles.
+    This endpoint is used for pre-rendering published profiles for SSG.
+    """
+    return await profile_service.get_published_profiles()
+
+
+@profile_controller_v1.get("/published/{username}")
+@handle_exceptions()
+async def get_published_profile(
+    username: str,
+    profile_service: ProfileServiceDep,
+):
+    """
+    Get a published profile.
+    This endpoint is used for pre-rendering published profiles for SSG.
+    """
+    return await profile_service.get_published_profile(username)
 
 
 @profile_controller_v1.get("/{username}")

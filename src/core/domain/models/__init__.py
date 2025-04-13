@@ -5,6 +5,7 @@ from .profile import (
     Position,
     Profile,
     Project,
+    PublishingOptions,
     VolunteeringExperience,
 )
 from .user import User
