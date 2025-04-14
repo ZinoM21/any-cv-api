@@ -40,7 +40,7 @@ def get_settings():
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 # Limits
-limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 # Logging
 logger = UvicornLogger()

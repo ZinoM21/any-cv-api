@@ -3,16 +3,24 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.middleware import SlowAPIMiddleware
 
 from src.controllers import (
     auth_controller_v1,
     file_controller_v1,
     profile_controller_v1,
 )
-from src.deps import Database, limiter, logger, settings
+from src.deps import (
+    Database,
+    limiter,
+    logger,
+    settings,
+)
 from src.infrastructure.exceptions import add_exception_handlers
-from src.infrastructure.middleware import AuthMiddleware
-from slowapi.middleware import SlowAPIMiddleware
+from src.infrastructure.middleware import (
+    AuthMiddleware,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI, logger=logger, db=Database):
@@ -45,7 +53,7 @@ app.state.limiter = limiter
 
 
 # Middleware
-app.add_middleware(AuthMiddleware)
+app.add_middleware(AuthMiddleware, logger=logger, settings=settings)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],

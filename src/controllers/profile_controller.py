@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Request
-from pydantic import BaseModel
 
 from src.core.domain.dtos import UpdateProfile
 from src.deps import (
@@ -8,12 +7,7 @@ from src.deps import (
     ProfileServiceDep,
     limiter,
 )
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
-
-
-class ProfileInfoRequest(BaseModel):
-    link: str
-
+from src.infrastructure.exceptions import handle_exceptions
 
 profile_controller_v1 = APIRouter(prefix="/v1/profile", tags=["profile"])
 

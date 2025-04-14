@@ -10,7 +10,7 @@ class Database:
         """Initialize database connection and Beanie"""
         try:
             connect("anycv", host=settings.mongodb_url)
-            logger.info("Successfully connected to MongoDB with Beanie")
+            logger.info("Successfully connected to MongoDB with MongoEngine")
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {str(e)}")
             raise

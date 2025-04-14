@@ -3,17 +3,28 @@ from fastapi.exception_handlers import http_exception_handler
 from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.deps import settings
+from src.config import Settings
+from src.core.domain.interfaces import ILogger
 from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
+    def __init__(
+        self,
+        app,
+        logger: ILogger,
+        settings: Settings,
+    ):
+        super().__init__(app)
+        self.logger = logger
+        self.settings = settings
+
     async def dispatch(self, request: Request, call_next):
         request.state.user = None
 
         is_protected_route = not any(
             request.url.path.startswith(excluded)
-            for excluded in settings.all_public_paths
+            for excluded in self.settings.all_public_paths
         )
         auth_header = request.headers.get("Authorization")
         has_bearer_token = auth_header and auth_header.startswith("Bearer ")
@@ -30,7 +41,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             token = auth_header.split(" ")[1]
             try:
                 payload = jwt.decode(
-                    token, settings.auth_secret, algorithms=[settings.auth_algorithm]
+                    token,
+                    self.settings.auth_secret,
+                    algorithms=[self.settings.auth_algorithm],
                 )
                 user_id = payload.get("sub")
                 if user_id:
