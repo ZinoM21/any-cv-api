@@ -9,10 +9,10 @@ from src.controllers import (
     file_controller_v1,
     profile_controller_v1,
 )
-from src.deps import Database, logger, settings
+from src.deps import Database, limiter, logger, settings
 from src.infrastructure.exceptions import add_exception_handlers
 from src.infrastructure.middleware import AuthMiddleware
-
+from slowapi.middleware import SlowAPIMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI, logger=logger, db=Database):
@@ -40,6 +40,10 @@ app = FastAPI(
 )
 
 
+# Limits
+app.state.limiter = limiter
+
+
 # Middleware
 app.add_middleware(AuthMiddleware)
 app.add_middleware(
@@ -49,6 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SlowAPIMiddleware)
 
 
 # Exception Handlers

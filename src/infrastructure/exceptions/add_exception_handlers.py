@@ -6,6 +6,8 @@ from fastapi.exception_handlers import (
 from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from src.core.domain.interfaces import ILogger
 
@@ -46,3 +48,10 @@ def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
         return JSONResponse(
             {"detail": "Internal Server error"}, status_code=500, headers=headers
         )
+
+    @app.exception_handler(RateLimitExceeded)
+    async def rate_limit_exceeded_handler(
+        request: Request, exc: RateLimitExceeded, logger=logger
+    ):
+        logger.error(f"Rate limit exceeded: {exc}")
+        return _rate_limit_exceeded_handler(request, exc)

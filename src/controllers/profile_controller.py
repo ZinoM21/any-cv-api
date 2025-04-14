@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from src.core.domain.dtos import UpdateProfile
@@ -6,6 +6,7 @@ from src.deps import (
     CurrentUserDep,
     OptionalCurrentUserDep,
     ProfileServiceDep,
+    limiter,
 )
 from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
@@ -58,8 +59,10 @@ async def get_profile(
 
 
 @profile_controller_v1.post("/{username}")
+@limiter.limit("3/minute")
 @handle_exceptions()
 async def create_profile(
+    request: Request,
     username: str,
     profile_service: ProfileServiceDep,
     user: OptionalCurrentUserDep,

@@ -2,6 +2,8 @@ from functools import lru_cache
 from typing import Annotated, Optional
 
 from fastapi import Depends, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.config import Settings, settings
 from src.core.domain.interfaces import (
@@ -37,6 +39,8 @@ def get_settings():
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
+# Limits
+limiter = Limiter(key_func=get_remote_address, default_limits=["200/minute"])
 
 # Logging
 logger = UvicornLogger()
