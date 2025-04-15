@@ -10,6 +10,10 @@ class IProfileRepository(ABC):
         pass
 
     @abstractmethod
+    def find_by_id(self, profile_id: str) -> Optional[Profile]:
+        pass
+
+    @abstractmethod
     def create(self, profile: Profile) -> Profile:
         pass
 

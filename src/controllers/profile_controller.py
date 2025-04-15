@@ -53,7 +53,7 @@ async def get_profile(
 
 
 @profile_controller_v1.post("/{username}")
-@limiter.limit("3/minute")
+@limiter.limit("3/minute; 10/day")
 @handle_exceptions()
 async def create_profile(
     request: Request,
@@ -88,3 +88,16 @@ async def transfer_guest_profile(
     Requires authentication.
     """
     return await profile_service.transfer_guest_profile_to_user(username, user)
+
+
+@profile_controller_v1.get("/user/list")
+@handle_exceptions()
+async def get_user_profiles(
+    profile_service: ProfileServiceDep,
+    user: CurrentUserDep,
+):
+    """
+    Get all profiles associated with the authenticated user.
+    Requires authentication.
+    """
+    return await profile_service.get_user_profiles(user)

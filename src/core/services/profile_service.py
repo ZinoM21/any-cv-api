@@ -330,3 +330,20 @@ class ProfileService:
         self.logger.debug(f"Guest profile deleted for username: {username}")
 
         return profile.to_mongo().to_dict()
+
+    @handle_exceptions()
+    async def get_user_profiles(self, user: User) -> list[dict]:
+        """
+        Get all profiles associated with the user.
+        """
+        if not user or not hasattr(user, "profiles") or not user.profiles:
+            return []
+
+        profiles = []
+        # User.profiles is a list of references
+        for profile_ref in user.profiles:  # type: ignore
+            profile = self.profile_repository.find_by_id(str(profile_ref.id))
+            if profile:
+                profiles.append(profile.to_mongo().to_dict())
+
+        return profiles

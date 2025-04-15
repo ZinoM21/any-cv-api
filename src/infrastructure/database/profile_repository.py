@@ -28,6 +28,13 @@ class ProfileRepository(IProfileRepository):
             return None
 
     @handle_exceptions()
+    def find_by_id(self, profile_id: str) -> Optional[Profile]:
+        try:
+            return Profile.objects.get(id=profile_id)  # type: ignore
+        except DoesNotExist:
+            return None
+
+    @handle_exceptions()
     def create(self, profile: Profile) -> Profile:
         return profile.save(cascade=True)
 
