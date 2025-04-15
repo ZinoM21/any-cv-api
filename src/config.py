@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     # Auth
     auth_secret: str
     access_token_expire_minutes: int = 15
-    refresh_token_expire_minutes: int = 60 * 24 * 7
+    refresh_token_expire_minutes: int = 60 * 24 * 14  # 2 weeks
     auth_algorithm: str = "HS256"
     public_paths: list[str] = [
         "/healthz",
