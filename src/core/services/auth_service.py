@@ -17,8 +17,7 @@ from src.core.domain.dtos import (
 )
 from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
 from src.core.domain.models import User
-from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import UnauthorizedHTTPException, handle_exceptions
 
 
 class AuthService(IAuthService):

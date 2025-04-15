@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.config import Settings
 from src.core.domain.interfaces import ILogger
-from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions import UnauthorizedHTTPException
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

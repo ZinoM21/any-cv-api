@@ -9,8 +9,8 @@ from supabase import Client, ClientOptions, create_client
 
 from src.config import Settings
 from src.core.domain.interfaces import IFileService, ILogger
-from src.core.domain.models.file import ImageDownload, SignedUrl
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.core.domain.models import ImageDownload, SignedUrl
+from src.infrastructure.exceptions import handle_exceptions
 
 
 class SupabaseFileService(IFileService):

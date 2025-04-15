@@ -9,7 +9,7 @@ from src.core.domain.dtos import (
     UserResponse,
 )
 from src.deps import AuthServiceDep
-from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions import UnauthorizedHTTPException
 
 auth_controller_v1 = APIRouter(prefix="/v1/auth", tags=["auth"])
 

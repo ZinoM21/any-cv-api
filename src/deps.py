@@ -16,9 +16,8 @@ from src.core.domain.interfaces import (
     IRemoteDataSource,
     IUserRepository,
 )
-from src.core.domain.models.user import User
-from src.core.services import AuthService, ProfileService
-from src.core.services.supabase_file_service import SupabaseFileService
+from src.core.domain.models import User
+from src.core.services import AuthService, ProfileService, SupabaseFileService
 from src.infrastructure.database import (
     Database,
     ProfileCacheRepository,
@@ -28,7 +27,7 @@ from src.infrastructure.database import (
 from src.infrastructure.exceptions import UnauthorizedHTTPException
 from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
-from src.infrastructure.transformers.data_transformer import DataTransformer
+from src.infrastructure.transformers import DataTransformer
 
 
 # Config

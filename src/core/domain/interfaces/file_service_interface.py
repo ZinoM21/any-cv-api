@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.core.domain.models.file import ImageDownload, SignedUrl
+from src.core.domain.models import ImageDownload, SignedUrl
 
 
 class IFileService(ABC):

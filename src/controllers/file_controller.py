@@ -2,9 +2,9 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.core.domain.models.file import SignedUrl
+from src.core.domain.models import SignedUrl
 from src.deps import CurrentUserDep, FileServiceDep
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import handle_exceptions
 
 
 class SignedUploadUrlRequest(BaseModel):

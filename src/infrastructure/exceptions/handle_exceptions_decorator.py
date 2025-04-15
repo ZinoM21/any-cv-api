@@ -7,7 +7,7 @@ from typing import (
 
 from fastapi.exceptions import HTTPException, RequestValidationError
 
-from src.infrastructure.exceptions.exceptions import (
+from src.infrastructure.exceptions import (
     UnauthorizedHTTPException,
     UncaughtException,
 )

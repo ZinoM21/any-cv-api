@@ -8,7 +8,7 @@ from fastapi.exceptions import HTTPException
 
 from src.config import Settings
 from src.core.domain.interfaces import ILogger, IRemoteDataSource
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import handle_exceptions
 
 
 class LinkedInAPI(IRemoteDataSource):
