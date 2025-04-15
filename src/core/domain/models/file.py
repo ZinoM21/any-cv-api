@@ -1,0 +1,12 @@
+from pydantic import BaseModel
+
+
+class ImageDownload(BaseModel):
+    data: bytes
+    filename: str
+    mimetype: str
+
+
+class SignedUrl(BaseModel):
+    url: str
+    path: str

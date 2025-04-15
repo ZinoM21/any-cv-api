@@ -3,16 +3,23 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.middleware import SlowAPIMiddleware
 
-from src.config import settings
 from src.controllers import (
     auth_controller_v1,
     file_controller_v1,
     profile_controller_v1,
 )
-from src.deps import Database, logger
-from src.infrastructure.exception_handlers import add_exception_handlers
-from src.infrastructure.middleware import AuthMiddleware
+from src.deps import (
+    Database,
+    limiter,
+    logger,
+    settings,
+)
+from src.infrastructure.exceptions import add_exception_handlers
+from src.infrastructure.middleware import (
+    AuthMiddleware,
+)
 
 
 @asynccontextmanager
@@ -41,7 +48,12 @@ app = FastAPI(
 )
 
 
+# Limits
+app.state.limiter = limiter
+
+
 # Middleware
+app.add_middleware(AuthMiddleware, logger=logger, settings=settings)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.frontend_url],
@@ -49,8 +61,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SlowAPIMiddleware)
 
-app.add_middleware(AuthMiddleware)
 
 # Exception Handlers
 add_exception_handlers(app, logger)

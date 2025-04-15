@@ -3,12 +3,12 @@ from typing import Optional
 
 from mongoengine import DoesNotExist
 
-from src.core.domain.interfaces import ILogger, IProfileRepository
+from src.core.domain.interfaces import ILogger, IProfileCacheRepository
 from src.core.domain.models import (
     Education,
     Experience,
+    GuestProfile,
     Position,
-    Profile,
     Project,
     PublishingOptions,
     VolunteeringExperience,
@@ -16,30 +16,30 @@ from src.core.domain.models import (
 from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
-class ProfileRepository(IProfileRepository):
+class ProfileCacheRepository(IProfileCacheRepository):
     def __init__(self, logger: ILogger):
         self.logger = logger
 
     @handle_exceptions()
-    def find_by_username(self, username: str) -> Optional[Profile]:
+    def find_by_username(self, username: str) -> Optional[GuestProfile]:
         try:
-            return Profile.objects.get(username=username)  # type: ignore
+            return GuestProfile.objects.get(username=username)
         except DoesNotExist:
             return None
 
     @handle_exceptions()
-    def create(self, profile: Profile) -> Profile:
-        return profile.save(cascade=True)
+    def create(self, guest_profile: GuestProfile) -> GuestProfile:
+        return guest_profile.save()
 
     @handle_exceptions()
-    def update(self, profile: Profile, new_data: dict) -> Profile:
+    def update(self, guest_profile: GuestProfile, new_data: dict) -> GuestProfile:
         new_data["updated_at"] = datetime.now(timezone.utc)
 
         # Handle nested documents properly
         if "education" in new_data:
             education_data = new_data.pop("education")
             if education_data is not None:
-                profile.education = [Education(**edu) for edu in education_data]
+                guest_profile.education = [Education(**edu) for edu in education_data]
 
         if "experiences" in new_data:
             experiences_data = new_data.pop("experiences")
@@ -51,39 +51,31 @@ class ProfileRepository(IProfileRepository):
                     experience = Experience(**exp)
                     experience.positions = [Position(**pos) for pos in positions_data]
                     experiences.append(experience)
-                profile.experiences = experiences
+                guest_profile.experiences = experiences
 
         if "volunteering" in new_data:
             volunteering_data = new_data.pop("volunteering")
             if volunteering_data is not None:
-                profile.volunteering = [
+                guest_profile.volunteering = [
                     VolunteeringExperience(**vol) for vol in volunteering_data
                 ]
 
         if "projects" in new_data:
             projects_data = new_data.pop("projects")
             if projects_data is not None:
-                profile.projects = [Project(**proj) for proj in projects_data]
+                guest_profile.projects = [Project(**proj) for proj in projects_data]
 
         if "publishingOptions" in new_data:
             publishing_data = new_data.pop("publishingOptions")
             if publishing_data is not None:
-                profile.publishingOptions = PublishingOptions(**publishing_data)
+                guest_profile.publishingOptions = PublishingOptions(**publishing_data)
 
         for key, value in new_data.items():
-            setattr(profile, key, value)
+            setattr(guest_profile, key, value)
 
-        return profile.save()
-
-    @handle_exceptions()
-    def find_published_profiles(self) -> list[Profile]:
-        return Profile.objects.filter(publishingOptions__exists=True)  # type: ignore
+        return guest_profile.save()
 
     @handle_exceptions()
-    def find_published_by_username(self, username: str) -> Optional[Profile]:
-        try:
-            return Profile.objects.get(  # type: ignore
-                username=username, publishingOptions__exists=True
-            )
-        except DoesNotExist:
-            return None
+    def delete(self, guest_profile: GuestProfile) -> None:
+        guest_profile.save()
+        guest_profile.delete()

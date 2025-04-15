@@ -1,22 +1,117 @@
+import time
+import traceback
+from typing import Any, Dict, Optional
+from urllib.parse import urlparse
+
 from dateutil import parser as date_parser
 
-from src.core.domain.interfaces import IDataTransformer
-from src.core.domain.interfaces.logger_interface import ILogger
-from src.core.domain.models.profile import (
+from src.config import Settings
+from src.core.domain.interfaces import IDataTransformer, IFileService, ILogger
+from src.core.domain.models import (
     Education,
     Experience,
     Position,
     Profile,
+    Project,
     VolunteeringExperience,
 )
 
 
+class DataTransformerError(Exception):
+    """Base exception for DataTransformer errors."""
+
+    pass
+
+
+class DataValidationError(DataTransformerError):
+    """Raised when data validation fails."""
+
+    pass
+
+
 class DataTransformer(IDataTransformer):
-    def __init__(self, logger):
+    """Transforms LinkedIn API data into domain model objects.
+
+    This transformer handles data from a third-party API, performing validation,
+    sanitization, and transformation into domain objects. It's designed to be
+    resilient against missing fields, malformed data, and API changes.
+    """
+
+    def __init__(self, logger, settings: Settings, file_service=None):
         self.logger: ILogger = logger
+        self.settings: Settings = settings
+        self.file_service: Optional[IFileService] = file_service
+
+    def _safe_get(self, data: Dict[str, Any], key: str, default: Any = None) -> Any:
+        """Safely retrieve a value from a dictionary, returning default if key doesn't exist."""
+        return data.get(key, default)
+
+    def _safe_extract_text(self, items: list[Dict[str, Any]]) -> str:
+        """Safely extract text from a list of components."""
+        if not items or not isinstance(items, list):
+            return ""
+
+        text_parts = []
+        for item in items:
+            if (
+                isinstance(item, dict)
+                and "text" in item
+                and item.get("type") == "textComponent"
+            ):
+                text_parts.append(item["text"])
+        return " ".join(text_parts)
+
+    async def _process_image_url(
+        self,
+        image_url: str,
+        is_authenticated: bool = True,
+        user_id: Optional[str] = None,
+    ) -> str | None:
+        """
+        Process an image URL - if it's a LinkedIn URL, download and upload to our storage
+        For unauthenticated users, no image processing is performed.
+        For authenticated users, images are stored in a folder with the user's ID.
+
+        Args:
+            image_url: The image URL to process
+            is_authenticated: Whether the user is authenticated
+            user_id: The ID of the authenticated user (if available)
+
+        Returns:
+            The file path in storage (not the public URL) or None
+        """
+        if not image_url or not self.file_service:
+            return None
+
+        # Skip image processing for unauthenticated users
+        if not is_authenticated:
+            return None
+
+        try:
+            parsed_url = urlparse(image_url)
+
+            if parsed_url.netloc in self.settings.LINKEDIN_MEDIA_DOMAINS:
+                image_download = await self.file_service.download_remote_image(
+                    image_url
+                )
+                if image_download:
+                    # Use user_id as path prefix for authenticated users
+                    path_prefix = user_id if user_id else ""
+                    file_path = await self.file_service.upload_image(
+                        image_download, path_prefix
+                    )
+                    return file_path
+
+        except Exception as e:
+            self.logger.error(f"Error processing image URL: {str(e)}")
+            return None
 
     def __extract_date_info(self, caption: str) -> tuple:
         """Helper to extract start date, end date and duration from caption."""
+        if not caption or not isinstance(caption, str):
+            self.logger.warn(f"Invalid date caption: {caption}")
+            return None, None, None
+
         try:
             date_parts = caption.split(" · ")
             dates = date_parts[0].split(" - ")
@@ -24,7 +119,11 @@ class DataTransformer(IDataTransformer):
             end_date_str = dates[1].strip() if len(dates) > 1 else None
 
             # Use dateutil's parser which handles various date formats
-            start_date = date_parser.parse(start_date_str, fuzzy=True)
+            start_date = (
+                date_parser.parse(start_date_str, fuzzy=True)
+                if start_date_str
+                else None
+            )
             # If end date is "Present" or similar, set to None
             end_date = (
                 None
@@ -35,93 +134,200 @@ class DataTransformer(IDataTransformer):
             duration = date_parts[1] if len(date_parts) > 1 else None
             return start_date, end_date, duration
         except Exception as e:
-            raise ValueError(f"Error extracting date info: {str(e)}")
+            self.logger.warn(f"Error extracting date info from '{caption}': {str(e)}")
+            return None, None, None
 
     def __extract_location_work_setting(self, metadata: str) -> tuple:
         """Helper to extract location and work setting from metadata."""
+        if not metadata or not isinstance(metadata, str):
+            return "", ""
+
         try:
             parts = metadata.split(" · ")
-            location = parts[0].strip()
-            work_setting = parts[1].strip() if len(parts) > 1 else None
+            location = parts[0].strip() if parts else ""
+            work_setting = parts[1].strip() if len(parts) > 1 else ""
             return location, work_setting
         except Exception as e:
-            raise ValueError(f"Error extracting location and work setting: {str(e)}")
+            self.logger.warn(
+                f"Error extracting location and work setting from '{metadata}': {str(e)}"
+            )
+            return "", ""
 
-    def __format_experience(self, exp: dict) -> Experience:
+    async def __format_experience(
+        self, exp: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Optional[Experience]:
+        """Transforms raw experience data into an Experience object.
+
+        Handles both single positions and multiple positions under one company.
+        Returns None if critical data is missing or malformed.
+        """
+        if not exp or not isinstance(exp, dict):
+            return None
+
         try:
+            # Check for required fields
+            if not exp.get("title"):
+                self.logger.warn("Experience missing required title field")
+                return None
+
+            # Process company logo
+            company_logo_url = exp.get("logo", "")
+            processed_logo_url = await self._process_image_url(
+                company_logo_url, is_authenticated, user_id
+            )
+
+            # Handle experiences with multiple positions (breakdown=true)
             if exp.get("breakdown"):
                 positions = []
+
+                # For multiple positions, the shared location is in the experience's caption
+                company_location = exp.get("caption", "").strip()
+
                 for pos in exp.get("subComponents", []):
                     if not pos.get("title"):  # Skip entries without title
                         continue
+
+                    # For multiple positions, dates and duration are in the position's caption
                     start_date, end_date, duration = self.__extract_date_info(
                         pos.get("caption", "")
                     )
+
+                    # Extract description from position's description field
+                    description = ""
+                    if isinstance(pos.get("description"), list):
+                        for desc in pos.get("description", []):
+                            if isinstance(desc, dict) and "text" in desc:
+                                if (
+                                    desc.get("type") == "textComponent"
+                                    or desc.get("type") is None
+                                ):
+                                    description += desc.get("text", "") + " "
+
+                    # For multiple positions, work setting is in the position's metadata
+                    work_setting = pos.get("metadata", "").strip()
+
+                    # Get additional role information from subtitle if available
+                    role_subtitle = pos.get("subtitle", "")
+                    full_title = pos.get("title", "")
+                    if role_subtitle:
+                        full_title = f"{full_title} ({role_subtitle})"
+
                     positions.append(
                         Position(
-                            title=pos["title"],
+                            title=full_title,
                             startDate=start_date,
                             endDate=end_date,
                             duration=duration,
-                            description=" ".join(
-                                d["text"]
-                                for d in pos.get("description", [])
-                                if isinstance(d, dict)
-                                and "text" in d
-                                and d.get("type") == "textComponent"
-                            ),
-                            location=exp.get("caption"),
-                            workSetting=pos.get("metadata"),
+                            description=description.strip(),
+                            location=company_location,
+                            workSetting=work_setting,
                         )
                     )
+
+                if not positions:  # Skip if no valid positions
+                    return None
+
                 return Experience(
                     company=exp["title"],
-                    companyProfileUrl=exp.get("companyLink1"),
-                    companyLogoUrl=exp.get("logo"),
+                    companyProfileUrl=exp.get("companyLink1", ""),
+                    companyLogoUrl=processed_logo_url,
                     positions=positions,
                 )
             else:
+                # Handle single position experiences (breakdown=false)
+
+                # For single positions, dates and duration are in the experience's caption
                 start_date, end_date, duration = self.__extract_date_info(
                     exp.get("caption", "")
                 )
+
+                # For single positions, location and work setting are in the experience's metadata
                 location, work_setting = self.__extract_location_work_setting(
                     exp.get("metadata", "")
                 )
+
+                # Extract the company name from subtitle (handle potential missing data)
+                company = ""
+                if exp.get("subtitle"):
+                    subtitle_parts = exp.get("subtitle", "").split(" · ")
+                    if subtitle_parts:
+                        company = subtitle_parts[0].strip()
+
+                description = ""
+                for subc in exp.get("subComponents", []):
+                    if isinstance(subc, dict):
+                        for d in subc.get("description", []):
+                            if (
+                                isinstance(d, dict)
+                                and "text" in d
+                                and d.get("type") == "textComponent"
+                            ):
+                                description += d["text"] + " "
+
                 return Experience(
-                    company=exp.get("subtitle", "").split(" · ")[0],
-                    companyProfileUrl=exp.get("companyLink1"),
-                    companyLogoUrl=exp.get("logo"),
+                    company=company,
+                    companyProfileUrl=exp.get("companyLink1", ""),
+                    companyLogoUrl=processed_logo_url,
                     positions=[
                         Position(
                             title=exp["title"],
                             startDate=start_date,
                             endDate=end_date,
                             duration=duration,
-                            description=" ".join(
-                                d["text"]
-                                for subc in exp.get("subComponents", [])
-                                for d in subc.get("description", [])
-                                if isinstance(d, dict)
-                                and "text" in d
-                                and d.get("type") == "textComponent"
-                            ),
+                            description=description.strip(),
                             location=location,
                             workSetting=work_setting,
                         )
                     ],
                 )
         except Exception as e:
-            raise ValueError(f"Error formatting experience: {str(e)}")
+            self.logger.error(
+                f"Error formatting experience: {str(e)}\n{traceback.format_exc()}"
+            )
+            return None
 
-    def __format_education(self, edu: dict) -> Education:
+    async def __format_education(
+        self, edu: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Optional[Education]:
+        """Transforms raw education data into an Education object.
+
+        Returns None if critical data is missing or malformed.
+        """
+        if not edu or not isinstance(edu, dict):
+            return None
+
         try:
+            # Check for required fields
+            if not edu.get("title"):
+                self.logger.warn("Education missing required title field")
+                return None
+
+            # Process school logo
+            school_logo_url = edu.get("logo", "")
+            processed_logo_url = await self._process_image_url(
+                school_logo_url, is_authenticated, user_id
+            )
+
+            # Extract date info
             start_date, end_date, _ = self.__extract_date_info(edu.get("caption", ""))
-            degree_parts = edu["subtitle"].split(", ")
+
+            # Default values for degree components
+            degree = ""
+            field_of_study = None
+
+            # Safely parse degree information
+            if edu.get("subtitle"):
+                degree_parts = edu["subtitle"].split(", ")
+                degree = degree_parts[0] if degree_parts else ""
+                field_of_study = degree_parts[1] if len(degree_parts) > 1 else None
 
             description_text = ""
             activities_text = ""
 
             for subc in edu.get("subComponents", []):
+                if not isinstance(subc, dict):
+                    continue
+
                 for desc in subc.get("description", []):
                     if isinstance(desc, dict):
                         if desc.get("type") == "textComponent":
@@ -131,10 +337,10 @@ class DataTransformer(IDataTransformer):
 
             return Education(
                 school=edu["title"],
-                schoolProfileUrl=edu.get("companyLink1"),
-                schoolPictureUrl=edu.get("logo"),
-                degree=degree_parts[0],
-                fieldOfStudy=degree_parts[1] if len(degree_parts) > 1 else None,
+                schoolProfileUrl=edu.get("companyLink1", ""),
+                schoolPictureUrl=processed_logo_url,
+                degree=degree,
+                fieldOfStudy=field_of_study,
                 startDate=start_date,
                 endDate=end_date,
                 activities=activities_text.strip() or None,
@@ -142,58 +348,294 @@ class DataTransformer(IDataTransformer):
             )
 
         except Exception as e:
-            raise ValueError(f"Error formatting education: {str(e)}")
+            self.logger.error(
+                f"Error formatting education: {str(e)}\n{traceback.format_exc()}"
+            )
+            return None
 
-    def __format_volunteering(self, vol: dict) -> VolunteeringExperience:
+    async def __format_volunteering(
+        self, vol: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Optional[VolunteeringExperience]:
+        """Transforms raw volunteering data into a VolunteeringExperience object.
+
+        Returns None if critical data is missing or malformed.
+        """
+        if not vol or not isinstance(vol, dict):
+            return None
+
         try:
+            # Check for required fields
+            if not vol.get("title") or not vol.get("subtitle"):
+                self.logger.warn(
+                    "Volunteering missing required title or subtitle field"
+                )
+                return None
+
+            # Process organization logo
+            org_logo_url = vol.get("logo", "")
+            processed_logo_url = await self._process_image_url(
+                org_logo_url, is_authenticated, user_id
+            )
+
             start_date, end_date, _ = self.__extract_date_info(vol.get("caption", ""))
+
+            description = ""
+            for subc in vol.get("subComponents", []):
+                if isinstance(subc, dict):
+                    for d in subc.get("description", []):
+                        if isinstance(d, dict) and "text" in d:
+                            description += d["text"] + " "
+
             return VolunteeringExperience(
                 role=vol["title"],
                 organization=vol["subtitle"],
-                organizationProfileUrl=vol.get("companyLink1"),
-                organizationLogoUrl=vol.get("logo"),
+                organizationProfileUrl=vol.get("companyLink1", ""),
+                organizationLogoUrl=processed_logo_url,
                 cause=vol.get("metadata", ""),
                 startDate=start_date,
                 endDate=end_date,
-                description=" ".join(
-                    d["text"]
-                    for subc in vol.get("subComponents", [])
-                    for d in subc.get("description", [])
-                    if isinstance(d, dict) and "text" in d
-                ),
+                description=description.strip(),
             )
 
         except Exception as e:
-            raise ValueError(f"Error formatting volunteering experience: {str(e)}")
+            self.logger.error(
+                f"Error formatting volunteering experience: {str(e)}\n{traceback.format_exc()}"
+            )
+            return None
 
-    def transform_profile_data(self, data: dict) -> Profile:
-        """Transform LinkedIn API response to match frontend types."""
+    async def __format_project(
+        self,
+        project_data: dict,
+        is_authenticated: bool = True,
+        user_id: Optional[str] = None,
+    ) -> Optional[Project]:
+        """Transforms raw project data into a Project object.
+
+        Returns None if critical data is missing or malformed.
+        """
+        if not project_data or not isinstance(project_data, dict):
+            return None
+
         try:
-            linkedin_data = data["data"]
+            # Check for required fields
+            if not project_data.get("title"):
+                self.logger.warn("Project missing required title field")
+                return None
 
-            profile_data = {
-                "username": linkedin_data["publicIdentifier"],
-                "firstName": linkedin_data["firstName"],
-                "lastName": linkedin_data["lastName"],
-                "profilePictureUrl": linkedin_data["profilePic"],
-                "jobTitle": linkedin_data["headline"],
-                "headline": linkedin_data["headline"],
-                "about": linkedin_data["about"],
-                "experiences": [
-                    self.__format_experience(exp)
-                    for exp in linkedin_data["experiences"]
-                ],
-                "education": [
-                    self.__format_education(edu) for edu in linkedin_data["educations"]
-                ],
-                "skills": [skill["title"] for skill in linkedin_data["skills"]],
-                "volunteering": [
-                    self.__format_volunteering(vol)
-                    for vol in linkedin_data["volunteerAndAwards"]
-                ],
-            }
+            # Extract dates and duration from the subtitle field
+            start_date, end_date, _ = self.__extract_date_info(
+                project_data.get("subtitle", "")
+            )
 
-            return Profile(**profile_data)
+            description = ""
+            associated_with = ""
+            url = ""
+
+            # Process sub-components for additional information
+            for subc in project_data.get("subComponents", []):
+                if isinstance(subc, dict):
+                    for desc in subc.get("description", []):
+                        if isinstance(desc, dict):
+                            # Extract text description
+                            if desc.get("type") == "textComponent" and "text" in desc:
+                                description += desc["text"] + " "
+
+                            # Extract association information
+                            elif (
+                                desc.get("type") == "insightComponent"
+                                and "text" in desc
+                            ):
+                                insight_text = desc["text"]
+                                if insight_text.startswith("Associated with"):
+                                    associated_with = insight_text.replace(
+                                        "Associated with", ""
+                                    ).strip()
+
+                            # Extract potential URL from media components
+                            elif (
+                                desc.get("type") == "mediaComponent"
+                                and "thumbnail" in desc
+                            ):
+                                url = desc.get("thumbnail", "")
+
+            return Project(
+                title=project_data["title"],
+                startDate=start_date,
+                endDate=end_date,
+                description=description.strip() or None,
+                url=url or None,
+                associatedWith=associated_with or None,
+            )
 
         except Exception as e:
-            raise ValueError(f"Error transforming profile data: {str(e)}")
+            self.logger.error(
+                f"Error formatting project: {str(e)}\n{traceback.format_exc()}"
+            )
+            return None
+
+    def __format_languages(self, languages_data: list[dict]) -> list[str]:
+        """Transforms raw language data into a list of formatted language strings.
+
+        Returns an empty list if no valid language entries are found.
+        """
+        formatted_languages = []
+        if not languages_data or not isinstance(languages_data, list):
+            return formatted_languages
+
+        for lang in languages_data:
+            try:
+                if not isinstance(lang, dict) or not lang.get("title"):
+                    continue
+
+                language_name = lang.get("title", "").strip()
+                proficiency = lang.get("caption", "").strip()
+
+                if language_name:
+                    if proficiency:
+                        formatted_languages.append(f"{language_name} - {proficiency}")
+                    else:
+                        formatted_languages.append(language_name)
+            except Exception as e:
+                self.logger.warn(f"Error formatting language entry: {str(e)}")
+                continue
+
+        return formatted_languages
+
+    async def transform_profile_data(
+        self, data: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+    ) -> Profile | None:
+        """Transform LinkedIn API response to match frontend types.
+
+        Implements retry logic for transient failures and comprehensive error handling.
+        Validates and sanitizes the input data to ensure consistent output format.
+
+        Args:
+            data: The raw LinkedIn API response.
+            is_authenticated: Whether the user is authenticated
+            user_id: The ID of the authenticated user (if available)
+
+        Returns:
+            A Profile object containing the transformed data.
+
+        Raises:
+            DataValidationError: If the data is critically malformed.
+            DataTransformerError: For other transformation errors.
+        """
+        retries = 0
+        last_exception = None
+
+        while retries < self.settings.MAX_RETRIES:
+            try:
+                # Validate the input data structure
+                if not data or not isinstance(data, dict):
+                    raise DataValidationError("Input data is null or not a dictionary")
+
+                if "data" not in data:
+                    raise DataValidationError("Input data missing 'data' field")
+
+                linkedin_data = data["data"]
+                if not linkedin_data or not isinstance(linkedin_data, dict):
+                    raise DataValidationError(
+                        "LinkedIn data is null or not a dictionary"
+                    )
+
+                # Check for required fields
+                required_fields = ["publicIdentifier", "firstName", "lastName"]
+                for field in required_fields:
+                    if field not in linkedin_data:
+                        raise DataValidationError(
+                            f"Required field '{field}' is missing"
+                        )
+
+                # Extract and format language data from LinkedIn
+                languages = self.__format_languages(linkedin_data.get("languages", []))
+
+                # Process profile picture
+                profile_pic_url = linkedin_data.get("profilePic", "")
+                processed_profile_pic_url = await self._process_image_url(
+                    profile_pic_url, is_authenticated, user_id
+                )
+                self.logger.debug(
+                    f"Processed profile picture URL: {processed_profile_pic_url}"
+                )
+
+                # Build profile data with safe defaults
+                profile_data = {
+                    "username": linkedin_data.get("publicIdentifier", ""),
+                    "firstName": linkedin_data.get("firstName", ""),
+                    "lastName": linkedin_data.get("lastName", ""),
+                    "profilePictureUrl": processed_profile_pic_url,
+                    "jobTitle": linkedin_data.get("headline", ""),
+                    "headline": linkedin_data.get("headline", ""),
+                    "about": linkedin_data.get("about", ""),
+                    "email": None,
+                    "phone": None,
+                    "location": linkedin_data.get("addressWithCountry", ""),
+                    "languages": languages,
+                    "experiences": [
+                        exp
+                        for exp in [
+                            await self.__format_experience(
+                                exp, is_authenticated, user_id
+                            )
+                            for exp in linkedin_data.get("experiences", [])
+                        ]
+                        if exp is not None
+                    ],
+                    "education": [
+                        edu
+                        for edu in [
+                            await self.__format_education(
+                                edu, is_authenticated, user_id
+                            )
+                            for edu in linkedin_data.get("educations", [])
+                        ]
+                        if edu is not None
+                    ],
+                    "skills": [
+                        skill.get("title", "")
+                        for skill in linkedin_data.get("skills", [])
+                        if isinstance(skill, dict) and skill.get("title")
+                    ],
+                    "volunteering": [
+                        vol
+                        for vol in [
+                            await self.__format_volunteering(
+                                vol, is_authenticated, user_id
+                            )
+                            for vol in linkedin_data.get("volunteerAndAwards", [])
+                        ]
+                        if vol is not None
+                    ],
+                    "projects": [
+                        proj
+                        for proj in [
+                            await self.__format_project(proj, is_authenticated, user_id)
+                            for proj in linkedin_data.get("projects", [])
+                        ]
+                        if proj is not None
+                    ],
+                }
+
+                # Create and return the profile
+                return Profile(**profile_data)
+
+            except DataValidationError as e:
+                # Don't retry validation errors - they're not transient
+                self.logger.error(f"Data validation error: {str(e)}")
+                raise
+
+            except Exception as e:
+                # Log the error and retry for other exceptions
+                last_exception = e
+                retries += 1
+                self.logger.warn(
+                    f"Error transforming profile data (attempt {retries}/{self.settings.MAX_RETRIES}): {str(e)}"
+                )
+
+                if retries < self.settings.MAX_RETRIES:
+                    time.sleep(self.settings.RETRY_DELAY_SECONDS)
+                else:
+                    error_msg = f"Failed to transform profile data after {self.settings.MAX_RETRIES} attempts: {str(e)}"
+                    self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
+                    raise DataTransformerError(error_msg) from last_exception

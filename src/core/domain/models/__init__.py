@@ -1,5 +1,13 @@
-from .profile import Profile, UpdateProfile
-from .user import User, UserCreate, UserUpdate
+from .guest_profile import GuestProfile
+from .profile import (
+    Education,
+    Experience,
+    Position,
+    Profile,
+    Project,
+    PublishingOptions,
+    VolunteeringExperience,
+)
+from .user import User
 
-# All models to instantiate on load
-__beanie_models__ = [Profile, User]
+__all__ = ["Profile", "User", "GuestProfile"]

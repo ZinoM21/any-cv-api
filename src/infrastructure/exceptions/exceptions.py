@@ -17,7 +17,7 @@ class UncaughtException(Exception):
 class UnauthorizedHTTPException(HTTPException):
     """Exception for unauthorized access"""
 
-    def __init__(self, detail: str | None = None) -> None:
+    def __init__(self, detail: str | None = "Unauthorized") -> None:
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=detail,

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from src.core.domain.models.user import (
+from src.core.domain.dtos import (
     AccessResponse,
     TokensResponse,
     UserCreate,

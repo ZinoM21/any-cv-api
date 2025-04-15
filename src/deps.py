@@ -1,7 +1,9 @@
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Optional
 
-from fastapi import Depends
+from fastapi import Depends, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from src.config import Settings, settings
 from src.core.domain.interfaces import (
@@ -9,16 +11,24 @@ from src.core.domain.interfaces import (
     IDataTransformer,
     IFileService,
     ILogger,
+    IProfileCacheRepository,
     IProfileRepository,
     IRemoteDataSource,
     IUserRepository,
 )
+from src.core.domain.models.user import User
 from src.core.services import AuthService, ProfileService
 from src.core.services.supabase_file_service import SupabaseFileService
-from src.infrastructure.database import Database, ProfileRepository, UserRepository
+from src.infrastructure.database import (
+    Database,
+    ProfileCacheRepository,
+    ProfileRepository,
+    UserRepository,
+)
+from src.infrastructure.exceptions import UnauthorizedHTTPException
 from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
-from src.infrastructure.transformers import DataTransformer
+from src.infrastructure.transformers.data_transformer import DataTransformer
 
 
 # Config
@@ -29,6 +39,8 @@ def get_settings():
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
+# Limits
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 # Logging
 logger = UvicornLogger()
@@ -42,7 +54,7 @@ LoggerDep = Annotated[ILogger, Depends(get_logger)]
 
 
 # Database
-def get_db() -> Database:
+def get_db():
     return Database
 
 
@@ -50,8 +62,8 @@ DatabaseDep = Annotated[Database, Depends(get_db)]
 
 
 # External
-def get_linkedin_api(logger: LoggerDep) -> IRemoteDataSource:
-    return LinkedInAPI(logger)
+def get_linkedin_api(logger: LoggerDep, settings: SettingsDep) -> IRemoteDataSource:
+    return LinkedInAPI(logger, settings)
 
 
 # Repositories
@@ -59,43 +71,111 @@ def get_profile_repository(logger: LoggerDep) -> IProfileRepository:
     return ProfileRepository(logger)
 
 
+def get_profile_cache_repository(logger: LoggerDep) -> IProfileCacheRepository:
+    return ProfileCacheRepository(logger)
+
+
 def get_user_repository(logger: LoggerDep) -> IUserRepository:
     return UserRepository(logger)
 
 
-# Data Transformer
-def get_data_transformer(logger: LoggerDep) -> IDataTransformer:
-    return DataTransformer(logger)
-
-
 # Services
+
+
+# File Service
+def get_file_service(logger: LoggerDep, settings: SettingsDep) -> IFileService:
+    return SupabaseFileService(logger, settings)
+
+
+FileServiceDep = Annotated[IFileService, Depends(get_file_service)]
+
+
+# Data Transformer
+def get_data_transformer(
+    logger: LoggerDep, settings: SettingsDep, file_service: FileServiceDep
+) -> IDataTransformer:
+    return DataTransformer(logger, settings, file_service)
+
+
 def get_profile_service(
     profile_repository: Annotated[IProfileRepository, Depends(get_profile_repository)],
+    profile_cache_repository: Annotated[
+        IProfileCacheRepository, Depends(get_profile_cache_repository)
+    ],
+    user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
     remote_data_source: Annotated[IRemoteDataSource, Depends(get_linkedin_api)],
-    logger: LoggerDep,
     data_transformer: Annotated[IDataTransformer, Depends(get_data_transformer)],
+    logger: LoggerDep,
 ) -> ProfileService:
     return ProfileService(
-        profile_repository, remote_data_source, logger, data_transformer
+        profile_repository,
+        profile_cache_repository,
+        user_repository,
+        remote_data_source,
+        logger,
+        data_transformer,
     )
 
 
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 
 
+# Auth
 def get_auth_service(
     user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
     logger: LoggerDep,
+    settings: SettingsDep,
 ) -> IAuthService:
-    return AuthService(user_repository, logger)
+    return AuthService(user_repository, logger, settings)
 
 
 AuthServiceDep = Annotated[IAuthService, Depends(get_auth_service)]
 
 
-# File Service
-def get_file_service(logger: LoggerDep) -> IFileService:
-    return SupabaseFileService(logger)
+# User
+async def get_current_user(
+    request: Request,
+    user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
+) -> User:
+    """
+    Dependency that retrieves the authenticated user based on the user_id
+    set in request.state by the auth middleware. Raises an exception if
+    the user is not authenticated.
+    """
+    if not hasattr(request.state, "user") or not request.state.user:
+        raise UnauthorizedHTTPException(detail="Not authenticated")
+
+    user_id = request.state.user.get("user_id")
+    if not user_id or not isinstance(user_id, str):
+        raise UnauthorizedHTTPException(detail="Not authenticated")
+
+    user = user_repository.find_by_id(user_id)
+
+    if not user:
+        raise UnauthorizedHTTPException(detail="Invalid authentication credentials")
+
+    return user
 
 
-FileServiceDep = Annotated[IFileService, Depends(get_file_service)]
+CurrentUserDep = Annotated[User, Depends(get_current_user)]
+
+
+async def get_optional_current_user(
+    request: Request,
+    user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
+) -> Optional[User]:
+    """
+    Dependency that retrieves the authenticated user if available,
+    but returns None instead of raising an exception if not authenticated.
+    """
+    if not hasattr(request.state, "user") or not request.state.user:
+        return None
+
+    user_id = request.state.user.get("user_id")
+    if not user_id:
+        return None
+
+    return user_repository.find_by_id(user_id)
+
+
+OptionalCurrentUserDep = Annotated[Optional[User], Depends(get_optional_current_user)]

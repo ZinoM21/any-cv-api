@@ -1,34 +1,34 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from uuid import UUID
 
 import jwt
 from fastapi import HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
 from passlib.context import CryptContext
 
-from src.config import settings
-from src.core.decorators.exception_handler import handle_exceptions
-from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
-from src.core.domain.models.user import (
+from src.config import Settings
+from src.core.domain.dtos import (
     AccessResponse,
     TokensResponse,
-    User,
     UserCreate,
     UserLogin,
     UserResponse,
 )
-from src.core.exceptions import UnauthorizedHTTPException
+from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
+from src.core.domain.models import User
+from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
 
 
 class AuthService(IAuthService):
     def __init__(
-        self,
-        user_repository: IUserRepository,
-        logger: ILogger,
+        self, user_repository: IUserRepository, logger: ILogger, settings: Settings
     ):
         self.user_repository = user_repository
         self.logger = logger
         self.pwd_context = CryptContext(schemes=["bcrypt"])
+        self.settings = settings
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return self.pwd_context.verify(plain_password, hashed_password)
@@ -46,47 +46,48 @@ class AuthService(IAuthService):
         )
 
         return jwt.encode(
-            data, settings.nextauth_secret, algorithm=settings.auth_algorithm
+            data, self.settings.auth_secret, algorithm=self.settings.auth_algorithm
         )
 
     def decode_token(self, token: str) -> dict:
         return jwt.decode(
-            token, settings.nextauth_secret, algorithms=[settings.auth_algorithm]
+            token,
+            self.settings.auth_secret,
+            algorithms=[self.settings.auth_algorithm],
         )
 
     def create_tokens(self, user: User, type: Optional[str] = None) -> dict:
         data_to_encode = {
             "sub": str(user.id),
             "email": user.email,
-            "username": user.username,
         }
 
         if type == "refresh":
             return {
                 "access": self.encode_with_expiry(
-                    data_to_encode, settings.access_token_expire_minutes
+                    data_to_encode, self.settings.access_token_expire_minutes
                 ),
             }
 
         return {
             "access": self.encode_with_expiry(
-                data_to_encode, settings.access_token_expire_minutes
+                data_to_encode, self.settings.access_token_expire_minutes
             ),
             "refresh": self.encode_with_expiry(
-                data_to_encode, settings.refresh_token_expire_minutes
+                data_to_encode, self.settings.refresh_token_expire_minutes
             ),
         }
 
     @handle_exceptions()
     async def authenticate_user(self, request_data: UserLogin) -> TokensResponse:
-        user = await self.user_repository.find_by_email(request_data.email)
+        user = self.user_repository.find_by_email(request_data.email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No user with this email",
             )
 
-        if not self.verify_password(request_data.password, user.pw_hash):
+        if not self.verify_password(request_data.password, str(user.pw_hash)):
             raise UnauthorizedHTTPException(
                 detail="Incorrect password",
             )
@@ -94,19 +95,9 @@ class AuthService(IAuthService):
         tokens = self.create_tokens(user)
         return TokensResponse(**tokens)
 
-
     @handle_exceptions()
     async def register_user(self, user_data: UserCreate) -> UserResponse:
-        existing_username = await self.user_repository.find_by_username(
-            user_data.username
-        )
-        if existing_username:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already registered",
-            )
-
-        existing_email = await self.user_repository.find_by_email(user_data.email)
+        existing_email = self.user_repository.find_by_email(user_data.email)
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -115,15 +106,19 @@ class AuthService(IAuthService):
 
         hashed_password = self.get_password_hash(user_data.password)
 
-        new_user = await self.user_repository.create(
-            User(
-                pw_hash=hashed_password,
+        new_user = self.user_repository.create(
+            {
+                "pw_hash": hashed_password,
                 **user_data.model_dump(exclude={"password"}),
-            )
+            }
         )
 
-        user_response = new_user.model_dump(exclude={"pw_hash"})
-        return UserResponse(**user_response)
+        return UserResponse(
+            id=UUID(str(new_user.id)),
+            email=str(new_user.email),
+            firstName=str(new_user.firstName),
+            lastName=str(new_user.lastName),
+        )
 
     @handle_exceptions()
     async def refresh_token(self, refresh_token: str) -> AccessResponse:
@@ -134,13 +129,13 @@ class AuthService(IAuthService):
         except InvalidTokenError:
             raise UnauthorizedHTTPException(detail="Invalid refresh token")
 
-        username = payload.get("username")
-        if username is None:
+        email = payload.get("email")
+        if email is None:
             raise UnauthorizedHTTPException(
                 detail="Invalid refresh token",
             )
 
-        user = await self.user_repository.find_by_username(username)
+        user = self.user_repository.find_by_email(email)
         if user is None:
             raise UnauthorizedHTTPException(detail="User not found")
 

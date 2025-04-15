@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.core.domain.models.user import (
+from src.core.domain.dtos import (
     AccessResponse,
     RefreshRequest,
     TokensResponse,
@@ -8,8 +8,8 @@ from src.core.domain.models.user import (
     UserLogin,
     UserResponse,
 )
-from src.core.exceptions import UnauthorizedHTTPException
 from src.deps import AuthServiceDep
+from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
 
 auth_controller_v1 = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -22,7 +22,7 @@ async def login_for_access_token(
     user = await auth_service.authenticate_user(user_data)
     if not user:
         raise UnauthorizedHTTPException(
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
         )
 
     return user

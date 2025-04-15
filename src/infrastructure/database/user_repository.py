@@ -1,11 +1,11 @@
-from typing import List, Optional
+from typing import Optional
 
-from beanie.operators import Or
+from mongoengine import DoesNotExist
 from pydantic import EmailStr
 
-from src.core.decorators import handle_exceptions
 from src.core.domain.interfaces import ILogger, IUserRepository
-from src.core.domain.models.user import User
+from src.core.domain.models import Profile, User
+from src.infrastructure.exceptions import handle_exceptions
 
 
 class UserRepository(IUserRepository):
@@ -13,22 +13,29 @@ class UserRepository(IUserRepository):
         self.logger = logger
 
     @handle_exceptions()
-    async def find_by_email(self, email: EmailStr) -> Optional[User]:
-        return await User.find_one(User.email == email)
+    def find_by_email(self, email: EmailStr) -> Optional[User]:
+        try:
+            return User.objects.get(email=email)
+        except DoesNotExist:
+            return None
 
     @handle_exceptions()
-    async def find_by_username_or_email(
-        self, username: str, email: str
-    ) -> Optional[List[User]]:
-        return await User.find(
-            Or(User.username == username, User.email == email)
-        ).to_list()
+    def find_by_id(self, user_id: str) -> Optional[User]:
+        try:
+            return User.objects.get(id=user_id)
+        except DoesNotExist:
+            return None
 
     @handle_exceptions()
-    async def find_by_username(self, username: str) -> Optional[User]:
-        return await User.find_one(User.username == username)
+    def create(self, user: dict) -> User:
+        return User(**user).save()
 
     @handle_exceptions()
-    async def create(self, user: User) -> User:
-        return await user.create()
-
+    def append_profile_to_user(self, profile: Profile, user: User) -> User:
+        try:
+            self.logger.debug(f"Appending profile to user: {profile}")
+            User.objects(id=user.id).update_one(push__profiles=profile)
+            return user.save()
+        except Exception as e:
+            self.logger.error(f"Error appending profile to user: {e}")
+            raise e
