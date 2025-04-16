@@ -25,7 +25,10 @@ from src.infrastructure.database import (
     ProfileRepository,
     UserRepository,
 )
-from src.infrastructure.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    UnauthorizedHTTPException,
+)
 from src.infrastructure.external import LinkedInAPI
 from src.infrastructure.logging import UvicornLogger
 from src.infrastructure.transformers.data_transformer import DataTransformer
@@ -143,16 +146,16 @@ async def get_current_user(
     the user is not authenticated.
     """
     if not hasattr(request.state, "user") or not request.state.user:
-        raise UnauthorizedHTTPException(detail="Not authenticated")
+        raise UnauthorizedHTTPException()
 
     user_id = request.state.user.get("user_id")
     if not user_id or not isinstance(user_id, str):
-        raise UnauthorizedHTTPException(detail="Not authenticated")
+        raise UnauthorizedHTTPException()
 
     user = user_repository.find_by_id(user_id)
 
     if not user:
-        raise UnauthorizedHTTPException(detail="Invalid authentication credentials")
+        raise UnauthorizedHTTPException(detail=ApiErrorType.InvalidCredentials.value)
 
     return user
 

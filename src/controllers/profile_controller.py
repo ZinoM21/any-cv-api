@@ -61,7 +61,7 @@ async def create_profile(
     profile_service: ProfileServiceDep,
     user: OptionalCurrentUserDep,
 ):
-    return await profile_service.create_profile(username, user)
+    return await profile_service.create_profile_from_remote_data(username, user)
 
 
 @profile_controller_v1.patch("/{username}")

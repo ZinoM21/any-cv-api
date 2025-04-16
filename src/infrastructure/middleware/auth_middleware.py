@@ -5,7 +5,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.config import Settings
 from src.core.domain.interfaces import ILogger
-from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    UnauthorizedHTTPException,
+)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -33,7 +36,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await http_exception_handler(
                 request,
                 UnauthorizedHTTPException(
-                    detail="Missing or invalid authorization header"
+                    detail=ApiErrorType.Unauthorized.value,
                 ),
             )
 
@@ -53,18 +56,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 # For protected routes, require valid user_id
                 if not user_id and is_protected_route:
                     return await http_exception_handler(
-                        request, UnauthorizedHTTPException(detail="Invalid token")
+                        request,
+                        UnauthorizedHTTPException(
+                            detail=ApiErrorType.InvalidToken.value,
+                        ),
                     )
 
             except JWTError as e:
                 if "expired" in str(e):
                     return await http_exception_handler(
-                        request, UnauthorizedHTTPException(detail="Token expired")
+                        request,
+                        UnauthorizedHTTPException(
+                            detail=ApiErrorType.TokenExpired.value,
+                        ),
                     )
                 # For protected routes, return error on invalid token
                 if is_protected_route:
                     return await http_exception_handler(
-                        request, UnauthorizedHTTPException(detail="Invalid token")
+                        request,
+                        UnauthorizedHTTPException(
+                            detail=ApiErrorType.InvalidToken.value,
+                        ),
                     )
 
         return await call_next(request)

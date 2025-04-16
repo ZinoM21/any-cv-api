@@ -13,7 +13,7 @@ from src.core.domain.models import (
     PublishingOptions,
     VolunteeringExperience,
 )
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import handle_exceptions
 
 
 class ProfileRepository(IProfileRepository):
@@ -31,6 +31,18 @@ class ProfileRepository(IProfileRepository):
     def find_by_id(self, profile_id: str) -> Optional[Profile]:
         try:
             return Profile.objects.get(id=profile_id)  # type: ignore
+        except DoesNotExist:
+            return None
+
+    @handle_exceptions()
+    def find_by_ids_and_username(
+        self, profile_ids: list[str], username: str
+    ) -> list[Profile] | None:
+        try:
+            profiles = Profile.objects(id__in=profile_ids, username=username)  # type: ignore
+            if len(profiles) == 0:
+                return None
+            return profiles
         except DoesNotExist:
             return None
 

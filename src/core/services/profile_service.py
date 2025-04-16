@@ -13,7 +13,10 @@ from src.core.domain.interfaces import (
     IUserRepository,
 )
 from src.core.domain.models import GuestProfile, Profile, User
-from src.infrastructure.exceptions import handle_exceptions
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    handle_exceptions,
+)
 
 
 class ProfileService:
@@ -64,8 +67,8 @@ class ProfileService:
         )
         if not raw_profile_data:
             raise HTTPException(
-                status_code=500,
-                detail="Could not fetch profile data from remote data source",
+                status_code=503,
+                detail=ApiErrorType.ServiceUnavailable.value,
             )
         self.logger.debug(
             f"Profile data fetched from remote Data Source for: {username}"
@@ -100,15 +103,35 @@ class ProfileService:
         return False
 
     @handle_exceptions()
-    async def _create_profile(self, username: str, user: User) -> dict:
+    async def _get_profile_from_user_by_username(
+        self, username: str, user: User
+    ) -> Optional[Profile]:
+        profile_ids = [str(p.id) for p in user.profiles]  # type: ignore
+        profiles = self.profile_repository.find_by_ids_and_username(
+            profile_ids, username
+        )
+        if profiles:
+            return profiles[0]
+        return None
+
+    @handle_exceptions()
+    async def _create_profile_for_user_from_remote_data(
+        self, username: str, user: User
+    ) -> dict:
         """Handle profile retrieval/creation for authenticated users"""
-        # Check if profile exists
-        profile = self.profile_repository.find_by_username(username)
-        if profile:
+        # Check if user already has this profile
+        profile_ids = [str(p.id) for p in user.profiles]  # type: ignore
+        profiles = self.profile_repository.find_by_ids_and_username(
+            profile_ids, username
+        )
+        if profiles:
             self.logger.debug(
-                f"Profile record found in db for authenticated user: {username}."
+                f"Profile already exists for user: {username}."
             )
-            return profile.to_mongo().to_dict()
+            raise HTTPException(
+                status_code=409,
+                detail=ApiErrorType.ResourceAlreadyExists.value,
+            )
 
         # Otherwise, fetch from LinkedIn & transform
         profile = await self._fetch_and_transform_profile(
@@ -122,7 +145,7 @@ class ProfileService:
         self.user_repository.append_profile_to_user(profile, user)
         self.logger.debug(f"Profile record created and linked to user for: {username}")
 
-        profile = self.profile_repository.find_by_username(username)
+        profile = self.profile_repository.find_by_id(str(profile.id))
         if not profile:
             raise HTTPException(
                 status_code=500,
@@ -132,7 +155,7 @@ class ProfileService:
         return profile.to_mongo().to_dict()
 
     @handle_exceptions()
-    async def _create_guest_profile(self, username: str) -> dict:
+    async def _create_guest_profile_from_remote_data(self, username: str) -> dict:
         """Handle profile retrieval/creation for guest users"""
         # Check cache / db first
         cached_profile = self.profile_cache_repository.find_by_username(username)
@@ -171,7 +194,9 @@ class ProfileService:
 
     # Public methods
     @handle_exceptions()
-    async def create_profile(self, link: str, user: Optional[User] = None) -> dict:
+    async def create_profile_from_remote_data(
+        self, link: str, user: Optional[User] = None
+    ) -> dict:
         """Create a profile by username with data from data broker. Uses db as cache."""
         username = self._extract_username(link)
         self.logger.debug(f"Extracted username: {username}")
@@ -179,24 +204,24 @@ class ProfileService:
         is_authenticated = user is not None
 
         if is_authenticated:
-            return await self._create_profile(username, user)
+            return await self._create_profile_for_user_from_remote_data(username, user)
 
-        return await self._create_guest_profile(username)
+        return await self._create_guest_profile_from_remote_data(username)
 
     @handle_exceptions()
     async def get_profile(self, username: str, user: Optional[User] = None) -> dict:
         """Get a profile by username from database"""
         if user:
-            profile = self.profile_repository.find_by_username(username)
+            profile = await self._get_profile_from_user_by_username(username, user)
             if not profile:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Profile not found for username: {username}",
+                    detail=ApiErrorType.ResourceNotFound.value,
                 )
             if not self._user_has_access_to_profile(user, profile):
                 raise HTTPException(
                     status_code=403,
-                    detail=f"User does not have access to profile: {username}",
+                    detail=ApiErrorType.Forbidden.value,
                 )
 
         else:
@@ -204,7 +229,7 @@ class ProfileService:
             if not profile:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Profile not found for username: {username}",
+                    detail=ApiErrorType.ResourceNotFound.value,
                 )
 
         return profile.to_mongo().to_dict()
@@ -222,7 +247,7 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=404,
-                detail=f"Profile not found for username: {username}",
+                detail=ApiErrorType.ResourceNotFound.value,
             )
         return profile.to_mongo().to_dict()
 
@@ -241,16 +266,16 @@ class ProfileService:
         )
 
         if user:
-            profile = self.profile_repository.find_by_username(username)
+            profile = await self._get_profile_from_user_by_username(username, user)
             if not profile:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Profile not found for username: {username}",
+                    detail=ApiErrorType.ResourceNotFound.value,
                 )
             if not self._user_has_access_to_profile(user, profile):
                 raise HTTPException(
                     status_code=403,
-                    detail=f"User does not have access to profile: {username}",
+                    detail=ApiErrorType.Forbidden.value,
                 )
 
             updated_profile = self.profile_repository.update(profile, data_to_update)
@@ -261,7 +286,7 @@ class ProfileService:
             if not guest_profile:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Profile not found for username: {username}",
+                    detail=ApiErrorType.ResourceNotFound.value,
                 )
 
             updated_profile = self.profile_cache_repository.update(
@@ -285,13 +310,13 @@ class ProfileService:
         if not guest_profile:
             raise HTTPException(
                 status_code=404,
-                detail=f"Guest profile not found for username: {username}",
+                detail=ApiErrorType.ResourceNotFound.value,
             )
 
         self.logger.debug(f"Found guest profile for username: {username}")
 
         # Check if user already has this profile
-        existing_profile = self.profile_repository.find_by_username(username)
+        existing_profile = await self._get_profile_from_user_by_username(username, user)
         if existing_profile:
             # If profile already exists, check if user has access
             if self._user_has_access_to_profile(user, existing_profile):
@@ -340,7 +365,6 @@ class ProfileService:
             return []
 
         profiles = []
-        # User.profiles is a list of references
         for profile_ref in user.profiles:  # type: ignore
             profile = self.profile_repository.find_by_id(str(profile_ref.id))
             if profile:

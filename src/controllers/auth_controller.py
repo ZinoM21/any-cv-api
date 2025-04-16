@@ -9,7 +9,10 @@ from src.core.domain.dtos import (
     UserResponse,
 )
 from src.deps import AuthServiceDep
-from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    UnauthorizedHTTPException,
+)
 
 auth_controller_v1 = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -22,7 +25,7 @@ async def login_for_access_token(
     user = await auth_service.authenticate_user(user_data)
     if not user:
         raise UnauthorizedHTTPException(
-            detail="Incorrect email or password",
+            detail=ApiErrorType.InvalidCredentials.value,
         )
 
     return user

@@ -1,5 +1,7 @@
 from fastapi import HTTPException, status
 
+from .exception_types import ApiErrorType
+
 
 class UncaughtException(Exception):
     """Exception for uncaught exceptions"""
@@ -17,7 +19,7 @@ class UncaughtException(Exception):
 class UnauthorizedHTTPException(HTTPException):
     """Exception for unauthorized access"""
 
-    def __init__(self, detail: str | None = "Unauthorized") -> None:
+    def __init__(self, detail: str | None = ApiErrorType.Unauthorized.value) -> None:
         super().__init__(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=detail,

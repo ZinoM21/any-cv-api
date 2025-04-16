@@ -14,6 +14,12 @@ class IProfileRepository(ABC):
         pass
 
     @abstractmethod
+    def find_by_ids_and_username(
+        self, profile_ids: list[str], username: str
+    ) -> Optional[list[Profile]]:
+        pass
+
+    @abstractmethod
     def create(self, profile: Profile) -> Profile:
         pass
 

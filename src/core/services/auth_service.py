@@ -17,8 +17,11 @@ from src.core.domain.dtos import (
 )
 from src.core.domain.interfaces import IAuthService, ILogger, IUserRepository
 from src.core.domain.models import User
-from src.infrastructure.exceptions.exceptions import UnauthorizedHTTPException
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    UnauthorizedHTTPException,
+    handle_exceptions,
+)
 
 
 class AuthService(IAuthService):
@@ -84,12 +87,12 @@ class AuthService(IAuthService):
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="No user with this email",
+                detail=ApiErrorType.InvalidCredentials.value,
             )
 
         if not self.verify_password(request_data.password, str(user.pw_hash)):
             raise UnauthorizedHTTPException(
-                detail="Incorrect password",
+                detail=ApiErrorType.InvalidCredentials.value,
             )
 
         tokens = self.create_tokens(user)
@@ -101,7 +104,7 @@ class AuthService(IAuthService):
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered",
+                detail=ApiErrorType.ResourceAlreadyExists.value,
             )
 
         hashed_password = self.get_password_hash(user_data.password)
@@ -125,19 +128,19 @@ class AuthService(IAuthService):
         try:
             payload = self.decode_token(refresh_token)
         except ExpiredSignatureError:
-            raise UnauthorizedHTTPException(detail="Refresh token has expired")
+            raise UnauthorizedHTTPException(detail=ApiErrorType.TokenExpired.value)
         except InvalidTokenError:
-            raise UnauthorizedHTTPException(detail="Invalid refresh token")
+            raise UnauthorizedHTTPException(detail=ApiErrorType.InvalidToken.value)
 
         email = payload.get("email")
         if email is None:
             raise UnauthorizedHTTPException(
-                detail="Invalid refresh token",
+                detail=ApiErrorType.InvalidToken.value,
             )
 
         user = self.user_repository.find_by_email(email)
         if user is None:
-            raise UnauthorizedHTTPException(detail="User not found")
+            raise UnauthorizedHTTPException(detail=ApiErrorType.InvalidToken.value)
 
         new_access_token = self.create_tokens(user, "refresh")
         return AccessResponse(**new_access_token)

@@ -10,7 +10,10 @@ from supabase import Client, ClientOptions, create_client
 from src.config import Settings
 from src.core.domain.interfaces import IFileService, ILogger
 from src.core.domain.models.file import ImageDownload, SignedUrl
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    handle_exceptions,
+)
 
 
 class SupabaseFileService(IFileService):
@@ -84,7 +87,7 @@ class SupabaseFileService(IFileService):
         if not self.verify_path_access(file_path, user_id):
             raise HTTPException(
                 status_code=403,
-                detail="You do not have permission to access this file",
+                detail=ApiErrorType.Forbidden.value,
             )
 
         try:
@@ -129,7 +132,7 @@ class SupabaseFileService(IFileService):
             if not self.verify_path_access(filename, user_id):
                 raise HTTPException(
                     status_code=403,
-                    detail="You do not have permission to upload to this location",
+                    detail=ApiErrorType.Forbidden.value,
                 )
 
             response = self.supabase_service.storage.from_(

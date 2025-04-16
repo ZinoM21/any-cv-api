@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Dict
 
@@ -8,7 +9,10 @@ from fastapi.exceptions import HTTPException
 
 from src.config import Settings
 from src.core.domain.interfaces import ILogger, IRemoteDataSource
-from src.infrastructure.exceptions.handle_exceptions_decorator import handle_exceptions
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    handle_exceptions,
+)
 
 
 class LinkedInAPI(IRemoteDataSource):
@@ -46,19 +50,19 @@ class LinkedInAPI(IRemoteDataSource):
                 if response.status_code == 404:
                     raise HTTPException(
                         status_code=404,
-                        detail=f"No Profile found for username {username}",
+                        detail=ApiErrorType.ResourceNotFound.value,
                     )
 
                 if response.status_code != 200:
                     if "busy" in str(response.text).lower():
                         raise HTTPException(
                             status_code=503,
-                            detail="External service temporarily unavailable. Please try again later.",
+                            detail=ApiErrorType.ServiceUnavailable.value,
                         )
 
                     raise HTTPException(
                         status_code=500,
-                        detail=f"Error fetching profile data from RapidAPI: {response.text}",
+                        detail=ApiErrorType.ServiceUnavailable.value,
                     )
 
                 return response.json()

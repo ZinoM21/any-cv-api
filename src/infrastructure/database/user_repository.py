@@ -15,14 +15,14 @@ class UserRepository(IUserRepository):
     @handle_exceptions()
     def find_by_email(self, email: EmailStr) -> Optional[User]:
         try:
-            return User.objects.get(email=email)
+            return User.objects.get(email=email)  # type: ignore
         except DoesNotExist:
             return None
 
     @handle_exceptions()
     def find_by_id(self, user_id: str) -> Optional[User]:
         try:
-            return User.objects.get(id=user_id)
+            return User.objects.get(id=user_id)  # type: ignore
         except DoesNotExist:
             return None
 
@@ -34,7 +34,7 @@ class UserRepository(IUserRepository):
     def append_profile_to_user(self, profile: Profile, user: User) -> User:
         try:
             self.logger.debug(f"Appending profile to user: {profile}")
-            User.objects(id=user.id).update_one(push__profiles=profile)
+            User.objects(id=user.id).update_one(push__profiles=profile)  # type: ignore
             return user.save()
         except Exception as e:
             self.logger.error(f"Error appending profile to user: {e}")

@@ -71,7 +71,7 @@ class PublishingOptions(EmbeddedDocument):
 
 class Profile(Document):
     id = UUIDField(binary=False, default=uuid4, primary_key=True)
-    username = StringField(max_length=255, unique=True)
+    username = StringField(max_length=255)
     firstName = StringField(max_length=255)
     lastName = StringField(max_length=255)
     profilePictureUrl = StringField(max_length=255)
