@@ -4,7 +4,7 @@ from typing import Optional
 from urllib.parse import unquote, urlparse
 
 import aiohttp
-from fastapi.exceptions import HTTPException
+from fastapi import HTTPException, status
 from supabase import Client, ClientOptions, create_client
 
 from src.config import Settings
@@ -86,7 +86,7 @@ class SupabaseFileService(IFileService):
         """
         if not self.verify_path_access(file_path, user_id):
             raise HTTPException(
-                status_code=403,
+                status_code=status.HTTP_403_FORBIDDEN,
                 detail=ApiErrorType.Forbidden.value,
             )
 
@@ -120,7 +120,7 @@ class SupabaseFileService(IFileService):
         is_valid = await self.validate_file(file_type, file_size)
         if not is_valid:
             raise HTTPException(
-                status_code=400,
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid file type or size exceeds the maximum allowed ({self.settings.MAX_FILE_SIZE_MB}MB)",
             )
 
@@ -131,7 +131,7 @@ class SupabaseFileService(IFileService):
 
             if not self.verify_path_access(filename, user_id):
                 raise HTTPException(
-                    status_code=403,
+                    status_code=status.HTTP_403_FORBIDDEN,
                     detail=ApiErrorType.Forbidden.value,
                 )
 

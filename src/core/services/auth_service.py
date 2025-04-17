@@ -103,7 +103,7 @@ class AuthService(IAuthService):
         existing_email = self.user_repository.find_by_email(user_data.email)
         if existing_email:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=status.HTTP_409_CONFLICT,
                 detail=ApiErrorType.ResourceAlreadyExists.value,
             )
 

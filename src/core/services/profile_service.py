@@ -1,7 +1,8 @@
 import re
 from typing import Optional
 
-from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi import HTTPException, status
+from fastapi.exceptions import RequestValidationError
 
 from src.core.domain.dtos import UpdateProfile
 from src.core.domain.interfaces import (
@@ -67,7 +68,7 @@ class ProfileService:
         )
         if not raw_profile_data:
             raise HTTPException(
-                status_code=503,
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=ApiErrorType.ServiceUnavailable.value,
             )
         self.logger.debug(
@@ -80,7 +81,7 @@ class ProfileService:
         )
         if not profile:
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Could not use the fetched data to create a profile",
             )
         self.logger.debug(f"Profile data transformed for: {username}")
@@ -88,7 +89,7 @@ class ProfileService:
         # Check if profile data matches the username
         if profile.username != username:
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Fetched data does not match requested username: {username}",
             )
 
@@ -127,7 +128,7 @@ class ProfileService:
         if profiles:
             self.logger.debug(f"Profile already exists for user: {username}.")
             raise HTTPException(
-                status_code=409,
+                status_code=status.HTTP_409_CONFLICT,
                 detail=ApiErrorType.ResourceAlreadyExists.value,
             )
 
@@ -146,7 +147,7 @@ class ProfileService:
         profile = self.profile_repository.find_by_id(str(profile.id))
         if not profile:
             raise HTTPException(
-                status_code=500,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Profile not found for username: {username}",
             )
 
@@ -213,12 +214,12 @@ class ProfileService:
             profile = await self._get_profile_from_user_by_username(username, user)
             if not profile:
                 raise HTTPException(
-                    status_code=404,
+                    status_code=status.HTTP_404_NOT_FOUND,
                     detail=ApiErrorType.ResourceNotFound.value,
                 )
             if not self._user_has_access_to_profile(user, profile):
                 raise HTTPException(
-                    status_code=403,
+                    status_code=status.HTTP_403_FORBIDDEN,
                     detail=ApiErrorType.Forbidden.value,
                 )
 
@@ -226,7 +227,7 @@ class ProfileService:
             profile = self.profile_cache_repository.find_by_username(username)
             if not profile:
                 raise HTTPException(
-                    status_code=404,
+                    status_code=status.HTTP_404_NOT_FOUND,
                     detail=ApiErrorType.ResourceNotFound.value,
                 )
 
@@ -244,7 +245,7 @@ class ProfileService:
         profile = self.profile_repository.find_published_by_slug(slug)
         if not profile:
             raise HTTPException(
-                status_code=404,
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=ApiErrorType.ResourceNotFound.value,
             )
         return profile.to_mongo().to_dict()
@@ -267,12 +268,12 @@ class ProfileService:
             profile = await self._get_profile_from_user_by_username(username, user)
             if not profile:
                 raise HTTPException(
-                    status_code=404,
+                    status_code=status.HTTP_404_NOT_FOUND,
                     detail=ApiErrorType.ResourceNotFound.value,
                 )
             if not self._user_has_access_to_profile(user, profile):
                 raise HTTPException(
-                    status_code=403,
+                    status_code=status.HTTP_403_FORBIDDEN,
                     detail=ApiErrorType.Forbidden.value,
                 )
 
@@ -295,7 +296,7 @@ class ProfileService:
 
             if not guest_profile:
                 raise HTTPException(
-                    status_code=404,
+                    status_code=status.HTTP_404_NOT_FOUND,
                     detail=ApiErrorType.ResourceNotFound.value,
                 )
 
@@ -319,7 +320,7 @@ class ProfileService:
         guest_profile = self.profile_cache_repository.find_by_username(username)
         if not guest_profile:
             raise HTTPException(
-                status_code=404,
+                status_code=status.HTTP_404_NOT_FOUND,
                 detail=ApiErrorType.ResourceNotFound.value,
             )
 
