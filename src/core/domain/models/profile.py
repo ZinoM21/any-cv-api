@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from mongoengine import (
-    BooleanField,
     DateTimeField,
     Document,
     EmbeddedDocument,
@@ -65,8 +64,9 @@ class Project(EmbeddedDocument):
 
 
 class PublishingOptions(EmbeddedDocument):
-    darkMode = BooleanField(default=False)
+    appearance = StringField(max_length=255)
     templateId = StringField(max_length=255)
+    slug = StringField(max_length=30, unique=True)
 
 
 class Profile(Document):

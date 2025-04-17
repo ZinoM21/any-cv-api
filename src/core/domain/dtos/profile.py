@@ -55,8 +55,9 @@ class ProjectUpdate(BaseModel):
 
 
 class PublishingOptionsUpdate(BaseModel):
-    darkMode: Optional[bool] = None
+    appearance: Optional[str] = None
     templateId: Optional[str] = None
+    slug: str
 
 
 class UpdateProfile(BaseModel):

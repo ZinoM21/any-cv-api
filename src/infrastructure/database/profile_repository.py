@@ -96,13 +96,11 @@ class ProfileRepository(IProfileRepository):
 
     @handle_exceptions()
     def find_published_profiles(self) -> list[Profile]:
-        return Profile.objects.filter(publishingOptions__exists=True)  # type: ignore
+        return Profile.objects.filter(publishingOptions__slug__exists=True)  # type: ignore
 
     @handle_exceptions()
-    def find_published_by_username(self, username: str) -> Optional[Profile]:
+    def find_published_by_slug(self, slug: str) -> Optional[Profile]:
         try:
-            return Profile.objects.get(  # type: ignore
-                username=username, publishingOptions__exists=True
-            )
+            return Profile.objects.get(publishingOptions__slug=slug)  # type: ignore
         except DoesNotExist:
             return None

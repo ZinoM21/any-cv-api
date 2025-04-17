@@ -239,9 +239,9 @@ class ProfileService:
         return [profile.to_mongo().to_dict() for profile in profiles]
 
     @handle_exceptions()
-    async def get_published_profile(self, username: str) -> dict:
+    async def get_published_profile(self, slug: str) -> dict:
         """Get a published profile"""
-        profile = self.profile_repository.find_published_by_username(username)
+        profile = self.profile_repository.find_published_by_slug(slug)
         if not profile:
             raise HTTPException(
                 status_code=404,
@@ -276,7 +276,19 @@ class ProfileService:
                     detail=ApiErrorType.Forbidden.value,
                 )
 
-            updated_profile = self.profile_repository.update(profile, data_to_update)
+            try:
+                updated_profile = self.profile_repository.update(
+                    profile, data_to_update
+                )
+            except Exception as exc:
+                # Check for MongoDB duplicate key error (code 11000)
+                if "duplicate key error" in str(exc):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=ApiErrorType.ResourceAlreadyExists.value,
+                    )
+                else:
+                    raise exc
 
         else:
             guest_profile = self.profile_cache_repository.find_by_username(username)

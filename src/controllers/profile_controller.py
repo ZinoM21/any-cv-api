@@ -29,17 +29,17 @@ async def get_published_profiles(
     return await profile_service.get_published_profiles()
 
 
-@profile_controller_v1.get("/published/{username}")
+@profile_controller_v1.get("/published/{slug}")
 @handle_exceptions()
 async def get_published_profile(
-    username: str,
+    slug: str,
     profile_service: ProfileServiceDep,
 ):
     """
     Get a published profile.
     This endpoint is used for pre-rendering published profiles for SSG.
     """
-    return await profile_service.get_published_profile(username)
+    return await profile_service.get_published_profile(slug)
 
 
 @profile_controller_v1.get("/{username}")

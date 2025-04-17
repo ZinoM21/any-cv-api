@@ -32,7 +32,7 @@ class IProfileRepository(ABC):
         pass
 
     @abstractmethod
-    def find_published_by_username(self, username: str) -> Optional[Profile]:
+    def find_published_by_slug(self, slug: str) -> Optional[Profile]:
         pass
 
 
