@@ -125,9 +125,7 @@ class ProfileService:
             profile_ids, username
         )
         if profiles:
-            self.logger.debug(
-                f"Profile already exists for user: {username}."
-            )
+            self.logger.debug(f"Profile already exists for user: {username}.")
             raise HTTPException(
                 status_code=409,
                 detail=ApiErrorType.ResourceAlreadyExists.value,
