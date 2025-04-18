@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
 from fastapi.exception_handlers import (
     http_exception_handler,
     request_validation_exception_handler,
@@ -12,6 +12,7 @@ from slowapi.errors import RateLimitExceeded
 from src.core.domain.interfaces import ILogger
 
 from .exceptions import (
+    ApiErrorType,
     UnauthorizedHTTPException,
     UncaughtException,
 )
@@ -46,7 +47,9 @@ def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
         logger.error(f"Unhandled exception in {exc.origin}: {exc.detail}")
         headers = getattr(exc, "headers", None)
         return JSONResponse(
-            {"detail": "Internal Server error"}, status_code=500, headers=headers
+            {"detail": ApiErrorType.InternalServerError.value},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            headers=headers,
         )
 
     @app.exception_handler(RateLimitExceeded)

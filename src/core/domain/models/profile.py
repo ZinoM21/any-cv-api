@@ -60,7 +60,9 @@ class Project(EmbeddedDocument):
     endDate = DateTimeField()
     description = StringField()
     url = StringField(max_length=255)
+    thumbnail = StringField(max_length=255)
     associatedWith = StringField(max_length=255)
+
 
 
 class PublishingOptions(EmbeddedDocument):

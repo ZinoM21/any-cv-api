@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.core.domain.models.file import ImageDownload, SignedUrl
+from src.core.domain.models.file import File, SignedUrl
 
 
 class IFileService(ABC):
@@ -42,6 +42,27 @@ class IFileService(ABC):
         pass
 
     @abstractmethod
+    async def generate_public_url(self, file_path: str, slug: str) -> SignedUrl:
+        """
+        Generate a public URL for a file
+
+        Args:
+            file_path: Path of the file in storage
+            slug: ID of the profile
+
+        Returns:
+            SignedUrl containing the public URL
+        """
+        pass
+
+    @abstractmethod
+    async def copy_files_from_private_to_public(self, path: str) -> str:
+        """
+        Copy files from private to public bucket
+        """
+        pass
+
+    @abstractmethod
     async def validate_file(self, file_type: str, file_size: int) -> bool:
         """
         Validate file type and size
@@ -56,7 +77,7 @@ class IFileService(ABC):
         pass
 
     @abstractmethod
-    async def download_remote_image(self, image_url: str) -> Optional[ImageDownload]:
+    async def download_remote_image(self, image_url: str) -> Optional[File]:
         """
         Download an image from a remote URL
 
@@ -64,19 +85,23 @@ class IFileService(ABC):
             image_url: URL of the remote image
 
         Returns:
-            The image download or None if failed
+            The file or None if failed
         """
         pass
 
     @abstractmethod
-    async def upload_image(
-        self, image_download: ImageDownload, path_prefix: str = ""
-    ) -> Optional[str]:
+    async def upload_file(
+        self,
+        file: File,
+        bucket_name: Optional[str] = None,
+        path_prefix: str = "",
+    ) -> str:
         """
-        Upload an image to the file storage
+        Upload a file to the file storage
 
         Args:
-            image_download: The image download
+            file: The file to upload
+            bucket_name: Optional bucket name to store the file
             path_prefix: Optional directory prefix to store the file (e.g. user ID)
 
         Returns:

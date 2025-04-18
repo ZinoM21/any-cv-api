@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class ImageDownload(BaseModel):
+class File(BaseModel):
     data: bytes
     filename: str
     mimetype: str

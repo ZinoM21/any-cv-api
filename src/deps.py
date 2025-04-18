@@ -86,8 +86,12 @@ def get_user_repository(logger: LoggerDep) -> IUserRepository:
 
 
 # File Service
-def get_file_service(logger: LoggerDep, settings: SettingsDep) -> IFileService:
-    return SupabaseFileService(logger, settings)
+def get_file_service(
+    logger: LoggerDep,
+    settings: SettingsDep,
+    profile_repository: Annotated[IProfileRepository, Depends(get_profile_repository)],
+) -> IFileService:
+    return SupabaseFileService(logger, settings, profile_repository)
 
 
 FileServiceDep = Annotated[IFileService, Depends(get_file_service)]
@@ -107,6 +111,7 @@ def get_profile_service(
     ],
     user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
     remote_data_source: Annotated[IRemoteDataSource, Depends(get_linkedin_api)],
+    file_service: Annotated[IFileService, Depends(get_file_service)],
     data_transformer: Annotated[IDataTransformer, Depends(get_data_transformer)],
     logger: LoggerDep,
 ) -> ProfileService:
@@ -115,8 +120,9 @@ def get_profile_service(
         profile_cache_repository,
         user_repository,
         remote_data_source,
-        logger,
+        file_service,
         data_transformer,
+        logger,
     )
 
 

@@ -4,9 +4,10 @@ from typing import Optional
 from fastapi import HTTPException, status
 from fastapi.exceptions import RequestValidationError
 
-from src.core.domain.dtos import UpdateProfile
+from src.core.domain.dtos import PublishingOptionsUpdate, UpdateProfile
 from src.core.domain.interfaces import (
     IDataTransformer,
+    IFileService,
     ILogger,
     IProfileCacheRepository,
     IProfileRepository,
@@ -27,15 +28,17 @@ class ProfileService:
         profile_cache_repository: IProfileCacheRepository,
         user_repository: IUserRepository,
         remote_data_source: IRemoteDataSource,
-        logger: ILogger,
+        file_service: IFileService,
         data_transformer: IDataTransformer,
+        logger: ILogger,
     ):
         self.profile_repository = profile_repository
         self.profile_cache_repository = profile_cache_repository
         self.user_repository = user_repository
         self.remote_data_source = remote_data_source
-        self.logger = logger
+        self.file_service = file_service
         self.data_transformer = data_transformer
+        self.logger = logger
 
     def _extract_username(self, link: str) -> str:
         """Extract and validate LinkedIn username from URL or direct input"""
@@ -112,8 +115,34 @@ class ProfileService:
             profile_ids, username
         )
         if profiles:
+            # profiles should only have one entry since username is unique
             return profiles[0]
         return None
+
+    @handle_exceptions()
+    async def _make_files_public(self, profile: Profile) -> None:
+        """Make files public"""
+        self.logger.debug(f"Making files public for profile: {profile.username}")
+        all_files: list[str] = [
+            profile.profilePictureUrl,  # type: ignore
+        ]
+
+        for exp in profile.experiences:  # type: ignore
+            all_files.append(exp.companyLogoUrl)
+
+        for edu in profile.education:  # type: ignore
+            all_files.append(edu.schoolPictureUrl)
+
+        for vol in profile.volunteering:  # type: ignore
+            all_files.append(vol.organizationLogoUrl)
+
+        for proj in profile.projects:  # type: ignore
+            all_files.append(proj.thumbnail)
+
+        for file in all_files:
+            if file:
+                self.logger.debug(f"Copying file to public: {file}")
+                await self.file_service.copy_files_from_private_to_public(file)
 
     @handle_exceptions()
     async def _create_profile_for_user_from_remote_data(
@@ -277,19 +306,7 @@ class ProfileService:
                     detail=ApiErrorType.Forbidden.value,
                 )
 
-            try:
-                updated_profile = self.profile_repository.update(
-                    profile, data_to_update
-                )
-            except Exception as exc:
-                # Check for MongoDB duplicate key error (code 11000)
-                if "duplicate key error" in str(exc):
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail=ApiErrorType.ResourceAlreadyExists.value,
-                    )
-                else:
-                    raise exc
+            updated_profile = self.profile_repository.update(profile, data_to_update)
 
         else:
             guest_profile = self.profile_cache_repository.find_by_username(username)
@@ -305,6 +322,50 @@ class ProfileService:
             )
 
         return updated_profile.to_mongo().to_dict()
+
+    @handle_exceptions()
+    async def publish_profile(
+        self, username: str, data: PublishingOptionsUpdate, user: User
+    ) -> dict:
+        """
+        Publish a profile
+        """
+        publishing_options = data.model_dump(
+            mode="json",
+            exclude_unset=True,
+            exclude_none=True,
+        )
+
+        data_to_update = {
+            "publishingOptions": publishing_options,
+        }
+
+        profile = await self._get_profile_from_user_by_username(username, user)
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ApiErrorType.ResourceNotFound.value,
+            )
+        if not self._user_has_access_to_profile(user, profile):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ApiErrorType.Forbidden.value,
+            )
+
+        await self._make_files_public(profile)
+
+        try:
+            updated_profile = self.profile_repository.update(profile, data_to_update)
+            return updated_profile.to_mongo().to_dict()
+        except Exception as exc:
+            # Check for MongoDB duplicate key error (slug has to be unique)
+            if "duplicate key error" in str(exc):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=ApiErrorType.ResourceAlreadyExists.value,
+                )
+            else:
+                raise exc
 
     @handle_exceptions()
     async def transfer_guest_profile_to_user(self, username: str, user: User) -> dict:

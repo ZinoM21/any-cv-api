@@ -10,3 +10,4 @@ class ApiErrorType(Enum):
     ResourceNotFound = "resource_not_found"
     ResourceAlreadyExists = "resource_already_exists"
     ServiceUnavailable = "service_unavailable"
+    InternalServerError = "internal_server_error"

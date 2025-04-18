@@ -5,7 +5,7 @@ from typing import Dict
 import requests
 
 # import requests
-from fastapi.exceptions import HTTPException
+from fastapi import HTTPException, status
 
 from src.config import Settings
 from src.core.domain.interfaces import ILogger, IRemoteDataSource
@@ -49,19 +49,19 @@ class LinkedInAPI(IRemoteDataSource):
 
                 if response.status_code == 404:
                     raise HTTPException(
-                        status_code=404,
+                        status_code=status.HTTP_404_NOT_FOUND,
                         detail=ApiErrorType.ResourceNotFound.value,
                     )
 
                 if response.status_code != 200:
                     if "busy" in str(response.text).lower():
                         raise HTTPException(
-                            status_code=503,
+                            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             detail=ApiErrorType.ServiceUnavailable.value,
                         )
 
                     raise HTTPException(
-                        status_code=500,
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=ApiErrorType.ServiceUnavailable.value,
                     )
 

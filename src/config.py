@@ -26,7 +26,8 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_publishable_key: str
     supabase_secret_key: str
-    supabase_bucket: str = "files"
+    private_supabase_bucket: str = "files"
+    public_supabase_bucket: str = "public-files"
     MAX_FILE_SIZE_MB: int = 5  # 5MB
     ALLOWED_MIME_TYPES: Set[str] = {
         "image/jpeg",
@@ -50,6 +51,7 @@ class Settings(BaseSettings):
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh-access",
+        "/api/v1/files/public/",
     ]
     optional_auth_paths: list[str] = [
         "/api/v1/profile/",

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from src.core.domain.dtos import UpdateProfile
+from src.core.domain.dtos import PublishingOptionsUpdate, UpdateProfile
 from src.deps import (
     CurrentUserDep,
     OptionalCurrentUserDep,
@@ -73,6 +73,17 @@ async def update_profile(
     user: OptionalCurrentUserDep,
 ):
     return await profile_service.update_profile(username, profile_data, user)
+
+
+@profile_controller_v1.patch("/{username}/publish")
+@handle_exceptions()
+async def publish_profile(
+    username: str,
+    profile_data: PublishingOptionsUpdate,
+    profile_service: ProfileServiceDep,
+    user: CurrentUserDep,
+):
+    return await profile_service.publish_profile(username, profile_data, user)
 
 
 @profile_controller_v1.get("/{username}/transfer")

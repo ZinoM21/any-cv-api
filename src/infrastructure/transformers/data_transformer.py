@@ -1,3 +1,4 @@
+import re
 import time
 import traceback
 from typing import Any, Dict, Optional
@@ -61,11 +62,19 @@ class DataTransformer(IDataTransformer):
                 text_parts.append(item["text"])
         return " ".join(text_parts)
 
+    def _get_snake_case_file_name(self, starting_string: str) -> str:
+        """Get a filename for an image URL."""
+        # Convert to snake_case and append _logo
+        sanitized = re.sub(r"[^a-zA-Z0-9]", "_", starting_string.lower())
+        sanitized = re.sub(r"_+", "_", sanitized)
+        return f"{sanitized.strip('_')}_logo"
+
     async def _process_image_url(
         self,
         image_url: str,
         is_authenticated: bool = True,
         user_id: Optional[str] = None,
+        filename: Optional[str] = None,
     ) -> str | None:
         """
         Process an image URL - if it's a LinkedIn URL, download and upload to our storage
@@ -95,12 +104,15 @@ class DataTransformer(IDataTransformer):
                     image_url
                 )
                 if image_download:
+                    if filename:
+                        image_download.filename = filename
                     # Use user_id as path prefix for authenticated users
                     path_prefix = user_id if user_id else ""
-                    file_path = await self.file_service.upload_image(
-                        image_download, path_prefix
+                    uploaded_file_path = await self.file_service.upload_file(
+                        file=image_download,
+                        path_prefix=path_prefix,
                     )
-                    return file_path
+                    return uploaded_file_path
 
         except Exception as e:
             self.logger.error(f"Error processing image URL: {str(e)}")
@@ -170,10 +182,16 @@ class DataTransformer(IDataTransformer):
                 self.logger.warn("Experience missing required title field")
                 return None
 
+            # Extract company name from title
+            companyName = exp.get("title", "").strip()
+
             # Process company logo
             company_logo_url = exp.get("logo", "")
             processed_logo_url = await self._process_image_url(
-                company_logo_url, is_authenticated, user_id
+                company_logo_url,
+                is_authenticated,
+                user_id,
+                filename=self._get_snake_case_file_name(companyName),
             )
 
             # Handle experiences with multiple positions (breakdown=true)
@@ -228,7 +246,7 @@ class DataTransformer(IDataTransformer):
                     return None
 
                 return Experience(
-                    company=exp["title"],
+                    company=companyName,
                     companyProfileUrl=exp.get("companyLink1", ""),
                     companyLogoUrl=processed_logo_url,
                     positions=positions,
@@ -296,6 +314,8 @@ class DataTransformer(IDataTransformer):
         if not edu or not isinstance(edu, dict):
             return None
 
+        eduName = edu.get("title", "").strip()
+
         try:
             # Check for required fields
             if not edu.get("title"):
@@ -305,7 +325,10 @@ class DataTransformer(IDataTransformer):
             # Process school logo
             school_logo_url = edu.get("logo", "")
             processed_logo_url = await self._process_image_url(
-                school_logo_url, is_authenticated, user_id
+                school_logo_url,
+                is_authenticated,
+                user_id,
+                filename=self._get_snake_case_file_name(eduName),
             )
 
             # Extract date info
@@ -336,7 +359,7 @@ class DataTransformer(IDataTransformer):
                             activities_text += desc.get("text", "") + " "
 
             return Education(
-                school=edu["title"],
+                school=eduName,
                 schoolProfileUrl=edu.get("companyLink1", ""),
                 schoolPictureUrl=processed_logo_url,
                 degree=degree,
@@ -371,10 +394,15 @@ class DataTransformer(IDataTransformer):
                 )
                 return None
 
+            orgName = vol.get("subtitle", "").strip()
+
             # Process organization logo
             org_logo_url = vol.get("logo", "")
             processed_logo_url = await self._process_image_url(
-                org_logo_url, is_authenticated, user_id
+                org_logo_url,
+                is_authenticated,
+                user_id,
+                filename=self._get_snake_case_file_name(orgName),
             )
 
             start_date, end_date, _ = self.__extract_date_info(vol.get("caption", ""))
@@ -388,7 +416,7 @@ class DataTransformer(IDataTransformer):
 
             return VolunteeringExperience(
                 role=vol["title"],
-                organization=vol["subtitle"],
+                organization=orgName,
                 organizationProfileUrl=vol.get("companyLink1", ""),
                 organizationLogoUrl=processed_logo_url,
                 cause=vol.get("metadata", ""),
@@ -416,6 +444,8 @@ class DataTransformer(IDataTransformer):
         if not project_data or not isinstance(project_data, dict):
             return None
 
+        projectName = project_data.get("title", "").strip()
+
         try:
             # Check for required fields
             if not project_data.get("title"):
@@ -429,7 +459,7 @@ class DataTransformer(IDataTransformer):
 
             description = ""
             associated_with = ""
-            url = ""
+            thumbnail_path = ""
 
             # Process sub-components for additional information
             for subc in project_data.get("subComponents", []):
@@ -451,19 +481,27 @@ class DataTransformer(IDataTransformer):
                                         "Associated with", ""
                                     ).strip()
 
-                            # Extract potential URL from media components
+                            # Upload potential URL from media components
                             elif (
                                 desc.get("type") == "mediaComponent"
                                 and "thumbnail" in desc
                             ):
-                                url = desc.get("thumbnail", "")
+                                thumbnailUrl = desc.get("thumbnail", "")
+                                thumbnail_path = await self._process_image_url(
+                                    thumbnailUrl,
+                                    is_authenticated,
+                                    user_id,
+                                    filename=self._get_snake_case_file_name(
+                                        projectName
+                                    ),
+                                )
 
             return Project(
-                title=project_data["title"],
+                title=projectName,
                 startDate=start_date,
                 endDate=end_date,
                 description=description.strip() or None,
-                url=url or None,
+                thumbnail=thumbnail_path or None,
                 associatedWith=associated_with or None,
             )
 
@@ -553,7 +591,10 @@ class DataTransformer(IDataTransformer):
                 # Process profile picture
                 profile_pic_url = linkedin_data.get("profilePic", "")
                 processed_profile_pic_url = await self._process_image_url(
-                    profile_pic_url, is_authenticated, user_id
+                    profile_pic_url,
+                    is_authenticated,
+                    user_id,
+                    filename="profile_picture",
                 )
                 self.logger.debug(
                     f"Processed profile picture URL: {processed_profile_pic_url}"

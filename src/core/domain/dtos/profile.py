@@ -52,6 +52,7 @@ class ProjectUpdate(BaseModel):
     description: Optional[str] = None
     url: Optional[str] = None
     associatedWith: Optional[str] = None
+    thumbnail: Optional[str] = None
 
 
 class PublishingOptionsUpdate(BaseModel):
