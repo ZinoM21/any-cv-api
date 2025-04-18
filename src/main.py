@@ -56,7 +56,7 @@ app.state.limiter = limiter
 app.add_middleware(AuthMiddleware, logger=logger, settings=settings)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
