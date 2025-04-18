@@ -114,6 +114,7 @@ def get_profile_service(
     file_service: Annotated[IFileService, Depends(get_file_service)],
     data_transformer: Annotated[IDataTransformer, Depends(get_data_transformer)],
     logger: LoggerDep,
+    settings: SettingsDep,
 ) -> ProfileService:
     return ProfileService(
         profile_repository,
@@ -123,6 +124,7 @@ def get_profile_service(
         file_service,
         data_transformer,
         logger,
+        settings,
     )
 
 

@@ -28,6 +28,10 @@ class IProfileRepository(ABC):
         pass
 
     @abstractmethod
+    def delete(self, profile: Profile) -> None:
+        pass
+
+    @abstractmethod
     def find_published_profiles(self) -> list[Profile]:
         pass
 

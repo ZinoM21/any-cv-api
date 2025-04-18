@@ -4,6 +4,7 @@ from typing import Optional
 from fastapi import HTTPException, status
 from fastapi.exceptions import RequestValidationError
 
+from src.config import Settings
 from src.core.domain.dtos import PublishingOptionsUpdate, UpdateProfile
 from src.core.domain.interfaces import (
     IDataTransformer,
@@ -31,6 +32,7 @@ class ProfileService:
         file_service: IFileService,
         data_transformer: IDataTransformer,
         logger: ILogger,
+        settings: Settings,
     ):
         self.profile_repository = profile_repository
         self.profile_cache_repository = profile_cache_repository
@@ -39,6 +41,7 @@ class ProfileService:
         self.file_service = file_service
         self.data_transformer = data_transformer
         self.logger = logger
+        self.settings = settings
 
     def _extract_username(self, link: str) -> str:
         """Extract and validate LinkedIn username from URL or direct input"""
@@ -120,24 +123,36 @@ class ProfileService:
         return None
 
     @handle_exceptions()
+    def _get_all_profile_files(self, profile: Profile) -> list[str]:
+        """Get all files associated with a profile as a list of strings"""
+        all_files: list[str] = []
+
+        if profile.profilePictureUrl:  # type: ignore
+            all_files.append(profile.profilePictureUrl)  # type: ignore
+
+        for exp in profile.experiences:  # type: ignore
+            if exp.companyLogoUrl:
+                all_files.append(exp.companyLogoUrl)
+
+        for edu in profile.education:  # type: ignore
+            if edu.schoolPictureUrl:
+                all_files.append(edu.schoolPictureUrl)
+
+        for vol in profile.volunteering:  # type: ignore
+            if vol.organizationLogoUrl:
+                all_files.append(vol.organizationLogoUrl)
+
+        for proj in profile.projects:  # type: ignore
+            if proj.thumbnail:
+                all_files.append(proj.thumbnail)
+
+        return [file for file in all_files if file]
+
+    @handle_exceptions()
     async def _make_files_public(self, profile: Profile) -> None:
         """Make files public"""
         self.logger.debug(f"Making files public for profile: {profile.username}")
-        all_files: list[str] = [
-            profile.profilePictureUrl,  # type: ignore
-        ]
-
-        for exp in profile.experiences:  # type: ignore
-            all_files.append(exp.companyLogoUrl)
-
-        for edu in profile.education:  # type: ignore
-            all_files.append(edu.schoolPictureUrl)
-
-        for vol in profile.volunteering:  # type: ignore
-            all_files.append(vol.organizationLogoUrl)
-
-        for proj in profile.projects:  # type: ignore
-            all_files.append(proj.thumbnail)
+        all_files: list[str] = self._get_all_profile_files(profile)
 
         for file in all_files:
             if file:
@@ -324,6 +339,31 @@ class ProfileService:
         return updated_profile.to_mongo().to_dict()
 
     @handle_exceptions()
+    async def delete_profile(self, username: str, user: User) -> None:
+        """
+        Delete a profile
+        Only the owner of the profile can delete it
+        """
+        profile = await self._get_profile_from_user_by_username(username, user)
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ApiErrorType.ResourceNotFound.value,
+            )
+        if not self._user_has_access_to_profile(user, profile):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ApiErrorType.Forbidden.value,
+            )
+
+        await self.file_service.delete_files_from_folder(
+            f"{user.id}/{profile.username}"
+        )
+
+        self.profile_repository.delete(profile)
+        return None
+
+    @handle_exceptions()
     async def publish_profile(
         self, username: str, data: PublishingOptionsUpdate, user: User
     ) -> dict:
@@ -366,6 +406,36 @@ class ProfileService:
                 )
             else:
                 raise exc
+
+    @handle_exceptions()
+    async def unpublish_profile(self, username: str, user: User) -> dict:
+        """
+        Unpublish a profile
+        """
+        profile = await self._get_profile_from_user_by_username(username, user)
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ApiErrorType.ResourceNotFound.value,
+            )
+        if not self._user_has_access_to_profile(user, profile):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ApiErrorType.Forbidden.value,
+            )
+
+        await self.file_service.delete_public_files_from_folder(
+            f"{user.id}/{profile.username}"
+        )
+
+        updated_profile = self.profile_repository.update(
+            profile,
+            {
+                "publishingOptions": {},
+            },
+        )
+
+        return updated_profile.to_mongo().to_dict()
 
     @handle_exceptions()
     async def transfer_guest_profile_to_user(self, username: str, user: User) -> dict:

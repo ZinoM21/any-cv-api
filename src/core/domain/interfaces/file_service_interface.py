@@ -108,3 +108,20 @@ class IFileService(ABC):
             The path of the uploaded file or None if failed
         """
         pass
+
+    @abstractmethod
+    async def delete_public_files_from_folder(self, folder_path: str) -> None:
+        """
+        Delete files from the private bucket
+        """
+        pass
+
+    @abstractmethod
+    async def delete_files_from_folder(self, folder_path: str) -> None:
+        """
+        Delete files from the file storage
+
+        Args:
+            folder_path: Path of the folder to delete
+        """
+        pass

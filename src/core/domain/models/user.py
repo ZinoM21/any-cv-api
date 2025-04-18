@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from mongoengine import (
-    NULLIFY,
+    PULL,
     DateTimeField,
     Document,
     EmailField,
@@ -23,6 +23,6 @@ class User(Document):
     lastName = StringField(max_length=255)
     created_at = DateTimeField(default=datetime.now(timezone.utc))
     updated_at = DateTimeField(default=datetime.now(timezone.utc))
-    profiles = ListField(ReferenceField(Profile, reverse_delete_rule=NULLIFY))
+    profiles = ListField(ReferenceField(Profile, reverse_delete_rule=PULL))
 
     meta = {"collection": "users", "indexes": ["email"]}

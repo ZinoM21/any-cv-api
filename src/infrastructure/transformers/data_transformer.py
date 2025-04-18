@@ -72,8 +72,8 @@ class DataTransformer(IDataTransformer):
     async def _process_image_url(
         self,
         image_url: str,
+        path_prefix: str,
         is_authenticated: bool = True,
-        user_id: Optional[str] = None,
         filename: Optional[str] = None,
     ) -> str | None:
         """
@@ -84,7 +84,8 @@ class DataTransformer(IDataTransformer):
         Args:
             image_url: The image URL to process
             is_authenticated: Whether the user is authenticated
-            user_id: The ID of the authenticated user (if available)
+            path_prefix: The path prefix for the file (if available)
+            filename: The filename for the file (if available)
 
         Returns:
             The file path in storage (not the public URL) or None
@@ -107,7 +108,6 @@ class DataTransformer(IDataTransformer):
                     if filename:
                         image_download.filename = filename
                     # Use user_id as path prefix for authenticated users
-                    path_prefix = user_id if user_id else ""
                     uploaded_file_path = await self.file_service.upload_file(
                         file=image_download,
                         path_prefix=path_prefix,
@@ -166,7 +166,10 @@ class DataTransformer(IDataTransformer):
             return "", ""
 
     async def __format_experience(
-        self, exp: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+        self,
+        exp: dict,
+        path_prefix: str,
+        is_authenticated: bool = True,
     ) -> Optional[Experience]:
         """Transforms raw experience data into an Experience object.
 
@@ -189,8 +192,8 @@ class DataTransformer(IDataTransformer):
             company_logo_url = exp.get("logo", "")
             processed_logo_url = await self._process_image_url(
                 company_logo_url,
-                is_authenticated,
-                user_id,
+                path_prefix=path_prefix,
+                is_authenticated=is_authenticated,
                 filename=self._get_snake_case_file_name(companyName),
             )
 
@@ -305,7 +308,10 @@ class DataTransformer(IDataTransformer):
             return None
 
     async def __format_education(
-        self, edu: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+        self,
+        edu: dict,
+        path_prefix: str,
+        is_authenticated: bool = True,
     ) -> Optional[Education]:
         """Transforms raw education data into an Education object.
 
@@ -326,8 +332,8 @@ class DataTransformer(IDataTransformer):
             school_logo_url = edu.get("logo", "")
             processed_logo_url = await self._process_image_url(
                 school_logo_url,
-                is_authenticated,
-                user_id,
+                is_authenticated=is_authenticated,
+                path_prefix=path_prefix,
                 filename=self._get_snake_case_file_name(eduName),
             )
 
@@ -377,7 +383,10 @@ class DataTransformer(IDataTransformer):
             return None
 
     async def __format_volunteering(
-        self, vol: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+        self,
+        vol: dict,
+        path_prefix: str,
+        is_authenticated: bool = True,
     ) -> Optional[VolunteeringExperience]:
         """Transforms raw volunteering data into a VolunteeringExperience object.
 
@@ -400,8 +409,8 @@ class DataTransformer(IDataTransformer):
             org_logo_url = vol.get("logo", "")
             processed_logo_url = await self._process_image_url(
                 org_logo_url,
-                is_authenticated,
-                user_id,
+                is_authenticated=is_authenticated,
+                path_prefix=path_prefix,
                 filename=self._get_snake_case_file_name(orgName),
             )
 
@@ -434,8 +443,8 @@ class DataTransformer(IDataTransformer):
     async def __format_project(
         self,
         project_data: dict,
+        path_prefix: str,
         is_authenticated: bool = True,
-        user_id: Optional[str] = None,
     ) -> Optional[Project]:
         """Transforms raw project data into a Project object.
 
@@ -489,8 +498,8 @@ class DataTransformer(IDataTransformer):
                                 thumbnailUrl = desc.get("thumbnail", "")
                                 thumbnail_path = await self._process_image_url(
                                     thumbnailUrl,
-                                    is_authenticated,
-                                    user_id,
+                                    is_authenticated=is_authenticated,
+                                    path_prefix=path_prefix,
                                     filename=self._get_snake_case_file_name(
                                         projectName
                                     ),
@@ -540,7 +549,10 @@ class DataTransformer(IDataTransformer):
         return formatted_languages
 
     async def transform_profile_data(
-        self, data: dict, is_authenticated: bool = True, user_id: Optional[str] = None
+        self,
+        data: dict,
+        is_authenticated: bool = True,
+        user_id: Optional[str] = None,
     ) -> Profile | None:
         """Transform LinkedIn API response to match frontend types.
 
@@ -585,6 +597,9 @@ class DataTransformer(IDataTransformer):
                             f"Required field '{field}' is missing"
                         )
 
+                username = linkedin_data.get("publicIdentifier", "")
+                file_path_prefix = (user_id + "/" if user_id else "") + username
+
                 # Extract and format language data from LinkedIn
                 languages = self.__format_languages(linkedin_data.get("languages", []))
 
@@ -592,8 +607,8 @@ class DataTransformer(IDataTransformer):
                 profile_pic_url = linkedin_data.get("profilePic", "")
                 processed_profile_pic_url = await self._process_image_url(
                     profile_pic_url,
-                    is_authenticated,
-                    user_id,
+                    is_authenticated=is_authenticated,
+                    path_prefix=file_path_prefix,
                     filename="profile_picture",
                 )
                 self.logger.debug(
@@ -602,7 +617,7 @@ class DataTransformer(IDataTransformer):
 
                 # Build profile data with safe defaults
                 profile_data = {
-                    "username": linkedin_data.get("publicIdentifier", ""),
+                    "username": username,
                     "firstName": linkedin_data.get("firstName", ""),
                     "lastName": linkedin_data.get("lastName", ""),
                     "profilePictureUrl": processed_profile_pic_url,
@@ -617,7 +632,9 @@ class DataTransformer(IDataTransformer):
                         exp
                         for exp in [
                             await self.__format_experience(
-                                exp, is_authenticated, user_id
+                                exp,
+                                path_prefix=file_path_prefix,
+                                is_authenticated=is_authenticated,
                             )
                             for exp in linkedin_data.get("experiences", [])
                         ]
@@ -627,7 +644,9 @@ class DataTransformer(IDataTransformer):
                         edu
                         for edu in [
                             await self.__format_education(
-                                edu, is_authenticated, user_id
+                                edu,
+                                path_prefix=file_path_prefix,
+                                is_authenticated=is_authenticated,
                             )
                             for edu in linkedin_data.get("educations", [])
                         ]
@@ -642,7 +661,9 @@ class DataTransformer(IDataTransformer):
                         vol
                         for vol in [
                             await self.__format_volunteering(
-                                vol, is_authenticated, user_id
+                                vol,
+                                path_prefix=file_path_prefix,
+                                is_authenticated=is_authenticated,
                             )
                             for vol in linkedin_data.get("volunteerAndAwards", [])
                         ]
@@ -651,7 +672,11 @@ class DataTransformer(IDataTransformer):
                     "projects": [
                         proj
                         for proj in [
-                            await self.__format_project(proj, is_authenticated, user_id)
+                            await self.__format_project(
+                                proj,
+                                path_prefix=file_path_prefix,
+                                is_authenticated=is_authenticated,
+                            )
                             for proj in linkedin_data.get("projects", [])
                         ]
                         if proj is not None

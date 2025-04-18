@@ -75,6 +75,20 @@ async def update_profile(
     return await profile_service.update_profile(username, profile_data, user)
 
 
+@profile_controller_v1.delete("/{username}")
+@handle_exceptions()
+async def delete_profile(
+    username: str,
+    profile_service: ProfileServiceDep,
+    user: CurrentUserDep,
+):
+    """
+    Delete a profile.
+    Requires authentication. Only the owner of the profile can delete it.
+    """
+    return await profile_service.delete_profile(username, user)
+
+
 @profile_controller_v1.patch("/{username}/publish")
 @handle_exceptions()
 async def publish_profile(
@@ -84,6 +98,20 @@ async def publish_profile(
     user: CurrentUserDep,
 ):
     return await profile_service.publish_profile(username, profile_data, user)
+
+
+@profile_controller_v1.patch("/{username}/unpublish")
+@handle_exceptions()
+async def unpublish_profile(
+    username: str,
+    profile_service: ProfileServiceDep,
+    user: CurrentUserDep,
+):
+    """
+    Unpublish a profile.
+    Requires authentication. Only the owner of the profile can unpublish it.
+    """
+    return await profile_service.unpublish_profile(username, user)
 
 
 @profile_controller_v1.get("/{username}/transfer")

@@ -5,6 +5,7 @@ from urllib.parse import unquote, urlparse
 
 import aiohttp
 from fastapi import HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from supabase import Client, ClientOptions, create_client
 
 from src.config import Settings
@@ -79,6 +80,16 @@ class SupabaseFileService(IFileService):
         """
         return path.startswith(f"{user_id}/") or path == user_id
 
+    def _get_all_files_from_folder_in_bucket(
+        self, bucket_name: str, folder_path: str
+    ) -> list[str]:
+        """
+        Get all files from a folder in a bucket
+        """
+        dict_array = self.supabase_service.storage.from_(bucket_name).list(folder_path)
+        self.logger.debug(f"DICT ARRAY files in folder: {dict_array}")
+        return [file["name"] for file in dict_array]
+
     @handle_exceptions()
     async def generate_signed_url(self, file_path: str, user_id: str) -> SignedUrl:
         """
@@ -91,6 +102,16 @@ class SupabaseFileService(IFileService):
         Returns:
             Dict containing the signed URL and other metadata
         """
+        if not file_path:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "loc": ["body", "file_path"],
+                        "msg": "file_path cannot be empty",
+                    }
+                ]
+            )
+
         if not self.verify_path_access(file_path, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -109,7 +130,11 @@ class SupabaseFileService(IFileService):
 
     @handle_exceptions()
     async def generate_signed_upload_url(
-        self, file_name: str, file_type: str, file_size: int, user_id: str
+        self,
+        file_name: str,
+        file_type: str,
+        file_size: int,
+        user_id: str,
     ) -> SignedUrl:
         """
         Generate a signed URL for file upload
@@ -134,7 +159,7 @@ class SupabaseFileService(IFileService):
         try:
             # Double check filename with correct extension & add user_id prefix
             filename, file_ext = os.path.splitext(file_name)
-            filename = f"{user_id}/{filename or file_name}{file_ext or mimetypes.guess_extension(file_type) or ''}"
+            filename = f"{filename or file_name}{file_ext or mimetypes.guess_extension(file_type) or ''}"
 
             if not self.verify_path_access(filename, user_id):
                 raise HTTPException(
@@ -297,3 +322,46 @@ class SupabaseFileService(IFileService):
 
         except Exception as e:
             raise Exception(f"Error uploading image: {str(e)}")
+
+    @handle_exceptions()
+    async def delete_private_files_from_folder(self, folder_path: str) -> None:
+        """
+        Delete files from the private bucket
+        """
+        private_files: list[str] = self._get_all_files_from_folder_in_bucket(
+            self.settings.private_supabase_bucket, folder_path
+        )
+        if private_files:
+            private_files_paths = [f"{folder_path}/{file}" for file in private_files]
+
+            self.supabase_service.storage.from_(self.private_bucket_name).remove(
+                private_files_paths
+            )
+            self.logger.debug("Files deleted from private bucket")
+
+    @handle_exceptions()
+    async def delete_public_files_from_folder(self, folder_path: str) -> None:
+        """
+        Delete files from the public bucket
+        """
+        public_files: list[str] = self._get_all_files_from_folder_in_bucket(
+            self.settings.public_supabase_bucket, folder_path
+        )
+        if public_files:
+            public_files_paths = [f"{folder_path}/{file}" for file in public_files]
+
+            self.supabase_service.storage.from_(self.public_bucket_name).remove(
+                public_files_paths
+            )
+            self.logger.debug("Files deleted from public bucket")
+
+    @handle_exceptions()
+    async def delete_files_from_folder(self, folder_path: str) -> None:
+        """
+        Delete files from the file storage
+
+        Args:
+            folder_path: Path of the folder to delete
+        """
+        await self.delete_private_files_from_folder(folder_path)
+        await self.delete_public_files_from_folder(folder_path)

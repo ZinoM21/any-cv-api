@@ -58,7 +58,7 @@ class ProjectUpdate(BaseModel):
 class PublishingOptionsUpdate(BaseModel):
     appearance: Optional[str] = None
     templateId: Optional[str] = None
-    slug: str
+    slug: Optional[str] = None
 
 
 class UpdateProfile(BaseModel):

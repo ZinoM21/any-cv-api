@@ -86,13 +86,21 @@ class ProfileRepository(IProfileRepository):
 
         if "publishingOptions" in new_data:
             publishing_data = new_data.pop("publishingOptions")
-            if publishing_data is not None:
+            if publishing_data:
                 profile.publishingOptions = PublishingOptions(**publishing_data)
+            else:
+                # If publishingOptions is empty, remove it
+                if hasattr(profile, "publishingOptions"):
+                    profile.publishingOptions = None
 
         for key, value in new_data.items():
             setattr(profile, key, value)
 
         return profile.save()
+
+    @handle_exceptions()
+    def delete(self, profile: Profile) -> None:
+        return profile.delete()
 
     @handle_exceptions()
     def find_published_profiles(self) -> list[Profile]:
