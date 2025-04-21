@@ -6,14 +6,10 @@ from .exception_types import ApiErrorType
 class UncaughtException(Exception):
     """Exception for uncaught exceptions"""
 
-    def __init__(self, origin: str, detail: str | None = None) -> None:
+    def __init__(self, origin: str, detail: str) -> None:
         super().__init__(detail)
-        if detail is None:
-            self.origin = "unknown origin"
-            self.detail = origin
-        else:
-            self.origin = origin
-            self.detail = detail
+        self.origin = origin
+        self.detail = detail
 
 
 class UnauthorizedHTTPException(HTTPException):
@@ -25,3 +21,16 @@ class UnauthorizedHTTPException(HTTPException):
             detail=detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+class HTTPExceptionWithOrigin(HTTPException):
+    """Exception for HTTP exceptions with an origin"""
+
+    def __init__(
+        self, status_code: int, origin: str, detail: str | None = None
+    ) -> None:
+        super().__init__(
+            status_code=status_code,
+            detail=detail,
+        )
+        self.origin = origin

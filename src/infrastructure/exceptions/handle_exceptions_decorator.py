@@ -8,6 +8,7 @@ from typing import (
 from fastapi.exceptions import HTTPException, RequestValidationError
 
 from src.infrastructure.exceptions import (
+    HTTPExceptionWithOrigin,
     UnauthorizedHTTPException,
     UncaughtException,
 )
@@ -46,16 +47,19 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return await func(*args, **kwargs)
-                except (
-                    UnauthorizedHTTPException,
-                    HTTPException,
-                    RequestValidationError,
-                ):
+                except (RequestValidationError,):
                     # Re-raise these exceptions directly
                     raise
-                except (Exception, UncaughtException) as e:
+                except (HTTPException, UnauthorizedHTTPException) as exc:
+                    # Add an origin to HTTPExceptions
+                    raise HTTPExceptionWithOrigin(
+                        status_code=exc.status_code,
+                        detail=exc.detail,
+                        origin=exception_origin,
+                    )
+                except (Exception, UncaughtException) as exc:
                     # All other exceptions are considered uncaught
-                    raise UncaughtException(origin=exception_origin, detail=str(e))
+                    raise UncaughtException(origin=exception_origin, detail=str(exc))
 
             return async_wrapper
 

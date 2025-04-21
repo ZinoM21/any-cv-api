@@ -13,24 +13,25 @@ from src.core.domain.interfaces import ILogger
 
 from .exceptions import (
     ApiErrorType,
-    UnauthorizedHTTPException,
+    HTTPExceptionWithOrigin,
     UncaughtException,
 )
 
 
 def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
-    @app.exception_handler(UnauthorizedHTTPException)
-    async def custom_unauth_http_exception_handler(
-        request: Request, exc: UnauthorizedHTTPException, logger=logger
-    ):
-        logger.error(f"Unauthorized HTTPException: {exc}")
-        return await http_exception_handler(request, exc)
 
     @app.exception_handler(HTTPException)
     async def custom_http_exception_handler(
         request: Request, exc: HTTPException, logger=logger
     ):
         logger.error(f"HTTPException: {exc}")
+        return await http_exception_handler(request, exc)
+
+    @app.exception_handler(HTTPExceptionWithOrigin)
+    async def custom_http_exception_with_origin_handler(
+        request: Request, exc: HTTPExceptionWithOrigin, logger=logger
+    ):
+        logger.error(f"HTTPException in {exc.origin}: {exc.detail}")
         return await http_exception_handler(request, exc)
 
     @app.exception_handler(RequestValidationError)

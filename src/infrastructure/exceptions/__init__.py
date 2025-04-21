@@ -1,6 +1,7 @@
 from .add_exception_handlers import add_exception_handlers
 from .exception_types import ApiErrorType
 from .exceptions import (
+    HTTPExceptionWithOrigin,
     UnauthorizedHTTPException,
     UncaughtException,
 )
