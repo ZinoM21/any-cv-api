@@ -356,11 +356,14 @@ class ProfileService:
                 detail=ApiErrorType.Forbidden.value,
             )
 
+        # Delete from db first to cache errors before deleting files
+        self.profile_repository.delete(profile)
+
+        # Then delete files
         await self.file_service.delete_files_from_folder(
             f"{user.id}/{profile.username}"
         )
 
-        self.profile_repository.delete(profile)
         return None
 
     @handle_exceptions()
@@ -392,10 +395,9 @@ class ProfileService:
                 detail=ApiErrorType.Forbidden.value,
             )
 
-        await self._make_files_public(profile)
-
         try:
             updated_profile = self.profile_repository.update(profile, data_to_update)
+            await self._make_files_public(profile)
             return updated_profile.to_mongo().to_dict()
         except Exception as exc:
             # Check for MongoDB duplicate key error (slug has to be unique)
