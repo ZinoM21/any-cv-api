@@ -64,11 +64,10 @@ class Project(EmbeddedDocument):
     associatedWith = StringField(max_length=255)
 
 
-
 class PublishingOptions(EmbeddedDocument):
     appearance = StringField(max_length=255)
     templateId = StringField(max_length=255)
-    slug = StringField(max_length=30, unique=True)
+    slug = StringField(max_length=30)  # sparse index
 
 
 class Profile(Document):
@@ -92,6 +91,14 @@ class Profile(Document):
     publishingOptions = EmbeddedDocumentField(PublishingOptions)
     created_at = DateTimeField(default=datetime.now(timezone.utc))
     updated_at = DateTimeField(default=datetime.now(timezone.utc))
-    # user = ReferenceField(User, reverse_delete_rule=NULLIFY)
 
-    meta = {"collection": "profiles"}
+    meta = {
+        "collection": "profiles",
+        "indexes": [
+            {
+                "fields": ["publishingOptions.slug"],
+                "unique": True,
+                "sparse": True,
+            }  # sparse allows multiple unpublished profiles
+        ],
+    }
