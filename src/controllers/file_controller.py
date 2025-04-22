@@ -1,3 +1,5 @@
+from typing import List
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -15,6 +17,10 @@ class SignedUploadUrlRequest(BaseModel):
 
 class SignedUrlRequest(BaseModel):
     file_path: str
+
+
+class SignedUrlsRequest(BaseModel):
+    file_paths: List[str]
 
 
 file_controller_v1 = APIRouter(prefix="/v1/files")
@@ -51,6 +57,20 @@ async def get_signed_url(
     """Get a signed URL for accessing files for authenticated users"""
     return await file_service.generate_signed_url(
         file_path=request.file_path,
+        user_id=str(current_user.id),
+    )
+
+
+@file_controller_v1.post("/signed-urls", response_model=List[SignedUrl])
+@handle_exceptions()
+async def get_signed_urls(
+    request: SignedUrlsRequest,
+    file_service: FileServiceDep,
+    current_user: CurrentUserDep,
+):
+    """Get multiple signed URLs for accessing files for authenticated users"""
+    return await file_service.generate_signed_urls(
+        file_paths=request.file_paths,
         user_id=str(current_user.id),
     )
 

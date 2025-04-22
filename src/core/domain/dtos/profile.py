@@ -70,6 +70,7 @@ class UpdateProfile(BaseModel):
     about: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    website: Optional[str] = None
     location: Optional[str] = None
     languages: Optional[List[str]] = None
     experiences: Optional[List[ExperienceUpdate]] = None

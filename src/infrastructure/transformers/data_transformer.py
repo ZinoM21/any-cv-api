@@ -626,6 +626,7 @@ class DataTransformer(IDataTransformer):
                     "about": linkedin_data.get("about", ""),
                     "email": None,
                     "phone": None,
+                    "website": linkedin_data.get("creatorWebsite", {}).get("link", ""),
                     "location": linkedin_data.get("addressWithCountry", ""),
                     "languages": languages,
                     "experiences": [

@@ -1,6 +1,6 @@
 import mimetypes
 import os
-from typing import Optional
+from typing import List, Optional
 from urllib.parse import unquote, urlparse
 
 import aiohttp
@@ -127,6 +127,46 @@ class SupabaseFileService(IFileService):
 
         except Exception as e:
             raise Exception(f"Error generating signed URL: {str(e)}")
+
+    @handle_exceptions()
+    async def generate_signed_urls(
+        self, file_paths: List[str], user_id: str
+    ) -> List[SignedUrl]:
+        """
+        Generate multiple signed URLs for files
+
+        Args:
+            file_paths: List of file paths in storage
+            user_id: ID of the user requesting the signed URLs
+
+        Returns:
+            List of SignedUrl objects containing the signed URLs
+        """
+        if not file_paths:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        "loc": ["body", "file_paths"],
+                        "msg": "file_paths cannot be empty",
+                    }
+                ]
+            )
+
+        for file_path in file_paths:
+            if not self.verify_path_access(file_path, user_id):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=ApiErrorType.Forbidden.value,
+                )
+
+        responses = self.supabase_service.storage.from_(
+            self.private_bucket_name
+        ).create_signed_urls(file_paths, expires_in=self.settings.EXPIRES_IN_SECONDS)
+
+        return [
+            SignedUrl(url=response["signedUrl"], path=response["path"])
+            for response in responses
+        ]
 
     @handle_exceptions()
     async def generate_signed_upload_url(

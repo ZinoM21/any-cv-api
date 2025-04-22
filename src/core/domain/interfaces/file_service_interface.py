@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import List, Optional
 
 from src.core.domain.models.file import File, SignedUrl
 
@@ -16,6 +16,22 @@ class IFileService(ABC):
 
         Returns:
             SignedUrl containing the signed URL
+        """
+        pass
+
+    @abstractmethod
+    async def generate_signed_urls(
+        self, file_paths: List[str], user_id: str
+    ) -> List[SignedUrl]:
+        """
+        Generate multiple signed URLs for files
+
+        Args:
+            file_paths: List of file paths in storage
+            user_id: ID of the user requesting the signed URLs
+
+        Returns:
+            List of SignedUrl objects containing the signed URLs
         """
         pass
 

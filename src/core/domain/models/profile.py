@@ -81,6 +81,7 @@ class Profile(Document):
     about = StringField()
     email = StringField(max_length=255)
     phone = StringField(max_length=255)
+    website = StringField(max_length=255)
     location = StringField(max_length=255)
     languages = ListField(StringField(max_length=255))
     experiences = EmbeddedDocumentListField(Experience)
