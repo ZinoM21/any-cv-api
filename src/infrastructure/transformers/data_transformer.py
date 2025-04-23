@@ -352,7 +352,7 @@ class DataTransformer(IDataTransformer):
 
             description_text = ""
             activities_text = ""
-
+            grade_text = ""
             for subc in edu.get("subComponents", []):
                 if not isinstance(subc, dict):
                     continue
@@ -362,7 +362,17 @@ class DataTransformer(IDataTransformer):
                         if desc.get("type") == "textComponent":
                             description_text += desc.get("text", "") + " "
                         elif desc.get("type") == "insightComponent":
-                            activities_text += desc.get("text", "") + " "
+                            text = desc.get("text", "")
+                            if text.startswith("Grade: "):
+                                grade = text[len("Grade: ") :].strip()
+                                grade_text = grade
+                            elif text.startswith("Activities and societies: "):
+                                activities_text += (
+                                    text[len("Activities and societies: ") :].strip()
+                                    + " "
+                                )
+                            else:
+                                activities_text += text + " "
 
             return Education(
                 school=eduName,
@@ -372,6 +382,7 @@ class DataTransformer(IDataTransformer):
                 fieldOfStudy=field_of_study,
                 startDate=start_date,
                 endDate=end_date,
+                grade=grade_text.strip() or None,
                 activities=activities_text.strip() or None,
                 description=description_text.strip() or None,
             )
