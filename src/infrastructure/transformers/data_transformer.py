@@ -574,7 +574,7 @@ class DataTransformer(IDataTransformer):
         retries = 0
         last_exception = None
 
-        while retries < self.settings.MAX_RETRIES:
+        while retries < self.settings.EXTERNAL_MAX_RETRIES:
             try:
                 # Validate the input data structure
                 if not data or not isinstance(data, dict):
@@ -697,12 +697,12 @@ class DataTransformer(IDataTransformer):
                 last_exception = e
                 retries += 1
                 self.logger.warn(
-                    f"Error transforming profile data (attempt {retries}/{self.settings.MAX_RETRIES}): {str(e)}"
+                    f"Error transforming profile data (attempt {retries}/{self.settings.EXTERNAL_MAX_RETRIES}): {str(e)}"
                 )
 
-                if retries < self.settings.MAX_RETRIES:
-                    time.sleep(self.settings.RETRY_DELAY_SECONDS)
+                if retries < self.settings.EXTERNAL_MAX_RETRIES:
+                    time.sleep(self.settings.EXTERNAL_RETRY_DELAY_SECONDS)
                 else:
-                    error_msg = f"Failed to transform profile data after {self.settings.MAX_RETRIES} attempts: {str(e)}"
+                    error_msg = f"Failed to transform profile data after {self.settings.EXTERNAL_MAX_RETRIES} attempts: {str(e)}"
                     self.logger.error(f"{error_msg}\n{traceback.format_exc()}")
                     raise DataTransformerError(error_msg) from last_exception

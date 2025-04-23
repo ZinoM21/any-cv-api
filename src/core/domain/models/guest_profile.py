@@ -42,7 +42,7 @@ class GuestProfile(Document):
         "indexes": [
             {
                 "fields": ["created_at"],
-                "expireAfterSeconds": settings.cache_guest_profile_sec,
+                "expireAfterSeconds": settings.CACHE_GUEST_PROFILES_TIME_IN_SECONDS,
             }
         ],
     }

@@ -49,14 +49,14 @@ class AuthService(IAuthService):
         )
 
         return jwt.encode(
-            data, self.settings.auth_secret, algorithm=self.settings.auth_algorithm
+            data, self.settings.AUTH_SECRET, algorithm=self.settings.AUTH_ALGORITHM
         )
 
     def decode_token(self, token: str) -> dict:
         return jwt.decode(
             token,
-            self.settings.auth_secret,
-            algorithms=[self.settings.auth_algorithm],
+            self.settings.AUTH_SECRET,
+            algorithms=[self.settings.AUTH_ALGORITHM],
         )
 
     def create_tokens(self, user: User, type: Optional[str] = None) -> dict:
@@ -68,16 +68,16 @@ class AuthService(IAuthService):
         if type == "refresh":
             return {
                 "access": self.encode_with_expiry(
-                    data_to_encode, self.settings.access_token_expire_minutes
+                    data_to_encode, self.settings.ACCESS_TOKEN_EXPIRES_IN_MINUTES
                 ),
             }
 
         return {
             "access": self.encode_with_expiry(
-                data_to_encode, self.settings.access_token_expire_minutes
+                data_to_encode, self.settings.ACCESS_TOKEN_EXPIRES_IN_MINUTES
             ),
             "refresh": self.encode_with_expiry(
-                data_to_encode, self.settings.refresh_token_expire_minutes
+                data_to_encode, self.settings.REFRESH_TOKEN_EXPIRES_IN_MINUTES
             ),
         }
 

@@ -30,12 +30,12 @@ class SupabaseFileService(IFileService):
 
         self.profile_repository = profile_repository
         self.supabase: Client = create_client(
-            self.settings.supabase_url,
-            self.settings.supabase_publishable_key,
+            self.settings.SUPABASE_URL,
+            self.settings.SUPABASE_PUBLISHABLE_KEY,
         )
         self.supabase_service: Client = create_client(
-            self.settings.supabase_url,
-            self.settings.supabase_secret_key,
+            self.settings.SUPABASE_URL,
+            self.settings.SUPABASE_SECRET_KEY,
             # TODO: Remove this once authorization is implemented
             ClientOptions(
                 headers={
@@ -43,8 +43,8 @@ class SupabaseFileService(IFileService):
                 }
             ),
         )
-        self.private_bucket_name = self.settings.private_supabase_bucket
-        self.public_bucket_name = self.settings.public_supabase_bucket
+        self.private_bucket_name = self.settings.SUPABASE_PRIVATE_BUCKET
+        self.public_bucket_name = self.settings.SUPABASE_PUBLIC_BUCKET
 
     async def validate_file(self, file_type: str, file_size: int) -> bool:
         """
@@ -121,7 +121,9 @@ class SupabaseFileService(IFileService):
         try:
             response = self.supabase_service.storage.from_(
                 self.private_bucket_name
-            ).create_signed_url(file_path, expires_in=self.settings.EXPIRES_IN_SECONDS)
+            ).create_signed_url(
+                file_path, expires_in=self.settings.SIGNED_FILE_EXPIRES_IN_SECONDS
+            )
 
             return SignedUrl(url=response["signedUrl"], path=file_path)
 
@@ -161,7 +163,9 @@ class SupabaseFileService(IFileService):
 
         responses = self.supabase_service.storage.from_(
             self.private_bucket_name
-        ).create_signed_urls(file_paths, expires_in=self.settings.EXPIRES_IN_SECONDS)
+        ).create_signed_urls(
+            file_paths, expires_in=self.settings.SIGNED_FILE_EXPIRES_IN_SECONDS
+        )
 
         return [
             SignedUrl(url=response["signedUrl"], path=response["path"])
@@ -331,7 +335,7 @@ class SupabaseFileService(IFileService):
         """
 
         if not bucket_name:
-            bucket_name = self.settings.private_supabase_bucket
+            bucket_name = self.settings.SUPABASE_PRIVATE_BUCKET
 
         try:
             # Validate
@@ -369,7 +373,7 @@ class SupabaseFileService(IFileService):
         Delete files from the private bucket
         """
         private_files: list[str] = self._get_all_files_from_folder_in_bucket(
-            self.settings.private_supabase_bucket, folder_path
+            self.settings.SUPABASE_PRIVATE_BUCKET, folder_path
         )
         if private_files:
             private_files_paths = [f"{folder_path}/{file}" for file in private_files]
@@ -385,7 +389,7 @@ class SupabaseFileService(IFileService):
         Delete files from the public bucket
         """
         public_files: list[str] = self._get_all_files_from_folder_in_bucket(
-            self.settings.public_supabase_bucket, folder_path
+            self.settings.SUPABASE_PUBLIC_BUCKET, folder_path
         )
         if public_files:
             public_files_paths = [f"{folder_path}/{file}" for file in public_files]

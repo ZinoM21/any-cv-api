@@ -45,8 +45,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             try:
                 payload = jwt.decode(
                     token,
-                    self.settings.auth_secret,
-                    algorithms=[self.settings.auth_algorithm],
+                    self.settings.AUTH_SECRET,
+                    algorithms=[self.settings.AUTH_ALGORITHM],
                 )
                 user_id = payload.get("sub")
                 if user_id:
