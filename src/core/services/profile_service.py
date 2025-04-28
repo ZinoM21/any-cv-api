@@ -15,7 +15,11 @@ from src.core.domain.interfaces import (
     IRemoteDataSource,
     IUserRepository,
 )
-from src.core.domain.models import GuestProfile, Profile, User
+from src.core.domain.models import (
+    GuestProfile,
+    Profile,
+    User,
+)
 from src.infrastructure.exceptions import (
     ApiErrorType,
     handle_exceptions,
@@ -122,42 +126,85 @@ class ProfileService:
             return profiles[0]
         return None
 
+    def _get_snake_case_file_name(self, starting_string: str) -> str:
+        """Get a filename for an image URL."""
+        # Convert to snake_case and append _logo
+        sanitized = re.sub(r"[^a-zA-Z0-9]", "_", starting_string.lower())
+        sanitized = re.sub(r"_+", "_", sanitized)
+        return f"{sanitized.strip('_')}_logo"
+
     @handle_exceptions()
-    def _get_all_profile_files(self, profile: Profile) -> list[str]:
-        """Get all files associated with a profile as a list of strings"""
-        all_files: list[str] = []
+    def _get_all_profile_files(self, profile: Profile) -> dict[str, str]:
+        """Get all files associated with a profile as a dictionary of name to file URL"""
+        all_files: dict[str, str] = {}
 
         if profile.profilePictureUrl:  # type: ignore
-            all_files.append(profile.profilePictureUrl)  # type: ignore
+            all_files["profilePicture"] = profile.profilePictureUrl  # type: ignore
 
         for exp in profile.experiences:  # type: ignore
             if exp.companyLogoUrl:
-                all_files.append(exp.companyLogoUrl)
+                company_name = exp.company if hasattr(exp, "company") else "company"
+                all_files[company_name] = exp.companyLogoUrl
 
         for edu in profile.education:  # type: ignore
             if edu.schoolPictureUrl:
-                all_files.append(edu.schoolPictureUrl)
+                school_name = edu.school if hasattr(edu, "school") else "school"
+                all_files[school_name] = edu.schoolPictureUrl
 
         for vol in profile.volunteering:  # type: ignore
             if vol.organizationLogoUrl:
-                all_files.append(vol.organizationLogoUrl)
+                org_name = (
+                    vol.organization if hasattr(vol, "organization") else "organization"
+                )
+                all_files[org_name] = vol.organizationLogoUrl
 
         for proj in profile.projects:  # type: ignore
             if proj.thumbnail:
-                all_files.append(proj.thumbnail)
+                proj_name = proj.title if hasattr(proj, "title") else "project"
+                all_files[proj_name] = proj.thumbnail
 
-        return [file for file in all_files if file]
+        return {k: v for k, v in all_files.items() if v}
 
     @handle_exceptions()
     async def _make_files_public(self, profile: Profile) -> None:
         """Make files public"""
         self.logger.debug(f"Making files public for profile: {profile.username}")
-        all_files: list[str] = self._get_all_profile_files(profile)
+        all_files: dict[str, str] = self._get_all_profile_files(profile)
 
-        for file in all_files:
-            if file:
-                self.logger.debug(f"Copying file to public: {file}")
-                await self.file_service.copy_files_from_private_to_public(file)
+        for _, file_path in all_files.items():
+            if file_path:
+                self.logger.debug(f"Copying file to public: {file_path}")
+                await self.file_service.copy_files_from_private_to_public(file_path)
+
+    @handle_exceptions()
+    async def _upload_all_profile_files(
+        self, profile: Profile, path_prefix: str
+    ) -> dict[str, str]:
+        """Upload all files from a profile to storage and return a mapping of old URLs to new file paths
+
+        Args:
+            profile: The profile to upload files from
+            path_prefix: The prefix to use for the file paths (i.e. user_id/username)
+
+        Returns:
+            dict[str, str]: A dictionary mapping old URLs to new file paths
+        """
+        self.logger.debug(f"Uploading files from guest profile: {profile.username}")
+        all_files: dict[str, str] = self._get_all_profile_files(profile)
+        new_paths: dict[str, str] = {}
+
+        for file_name, file_url in all_files.items():
+            if file_url:
+                self.logger.debug(f"Storing file: {file_name} for url: {file_url}")
+                new_path = await self.file_service.download_and_store_file(
+                    url=file_url,
+                    path_prefix=path_prefix,
+                    filename=self._get_snake_case_file_name(file_name),
+                )
+                if new_path:
+                    new_paths[file_url] = new_path
+
+        return new_paths
 
     @handle_exceptions()
     async def _create_profile_for_user_from_remote_data(
@@ -441,14 +488,92 @@ class ProfileService:
         return updated_profile.to_mongo().to_dict()
 
     @handle_exceptions()
+    async def _update_profile_with_new_file_paths(
+        self, profile: Profile, new_file_paths: dict[str, str]
+    ) -> Profile:
+        """
+        Update a profile with new file paths and return the updated profile.
+
+        Args:
+            profile: The profile to update
+            new_file_paths: A dictionary mapping old URLs to new file paths
+
+        Returns:
+            Profile: The updated profile or the original profile if no updates were made
+        """
+        update_data = {}
+        # Update profile picture
+        if profile.profilePictureUrl:
+            if str(profile.profilePictureUrl) in new_file_paths:
+                update_data["profilePictureUrl"] = new_file_paths[
+                    str(profile.profilePictureUrl)
+                ]
+
+        # Update experience company logos
+        if profile.experiences:
+            experiences_data = []
+            for exp in profile.experiences:  # type: ignore
+                exp_data = exp.to_mongo().to_dict()
+                if exp.companyLogoUrl:
+                    if str(exp.companyLogoUrl) in new_file_paths:
+                        exp_data["companyLogoUrl"] = new_file_paths[
+                            str(exp.companyLogoUrl)
+                        ]
+                experiences_data.append(exp_data)
+            update_data["experiences"] = experiences_data
+
+        # Update education school pictures
+        if profile.education:
+            education_data = []
+            for edu in profile.education:  # type: ignore
+                edu_data = edu.to_mongo().to_dict()
+                if edu.schoolPictureUrl:
+                    if str(edu.schoolPictureUrl) in new_file_paths:
+                        edu_data["schoolPictureUrl"] = new_file_paths[
+                            str(edu.schoolPictureUrl)
+                        ]
+                education_data.append(edu_data)
+            update_data["education"] = education_data
+
+        # Update volunteering organization logos
+        if profile.volunteering:
+            volunteering_data = []
+            for vol in profile.volunteering:  # type: ignore
+                vol_data = vol.to_mongo().to_dict()
+                if vol.organizationLogoUrl:
+                    if str(vol.organizationLogoUrl) in new_file_paths:
+                        vol_data["organizationLogoUrl"] = new_file_paths[
+                            str(vol.organizationLogoUrl)
+                        ]
+                volunteering_data.append(vol_data)
+            update_data["volunteering"] = volunteering_data
+
+        # Update project thumbnails
+        if profile.projects:
+            projects_data = []
+            for proj in profile.projects:  # type: ignore
+                proj_data = proj.to_mongo().to_dict()
+                if proj.thumbnail:
+                    if str(proj.thumbnail) in new_file_paths:
+                        proj_data["thumbnail"] = new_file_paths[str(proj.thumbnail)]
+                projects_data.append(proj_data)
+            update_data["projects"] = projects_data
+
+        # Save the updated profile
+        if update_data:
+            return self.profile_repository.update(profile, update_data)
+        return profile
+
+    @handle_exceptions()
     async def transfer_guest_profile_to_user(self, username: str, user: User) -> dict:
         """
         Transfer a guest profile to a user profile after sign-in.
         1. Find the guest profile
         2. Create a new Profile entry
-        3. Link it to the user
-        4. Delete the guest profile
-        5. Return the new profile
+        3. Download & store all files.
+        4. Link it to the user
+        5. Delete the guest profile
+        6. Return the new profile
         """
         # Check if guest profile exists
         guest_profile = self.profile_cache_repository.find_by_username(username)
@@ -491,6 +616,16 @@ class ProfileService:
             projects=guest_profile.projects,
         )
         profile = self.profile_repository.create(new_profile)
+
+        # Upload all files from guest profile to storage and get new paths
+        path_prefix = str(user.id) + "/" + username
+        new_file_paths = await self._upload_all_profile_files(profile, path_prefix)
+
+        # Update profile with new file paths
+        if new_file_paths:
+            profile = await self._update_profile_with_new_file_paths(
+                profile, new_file_paths
+            )
 
         # Link profile to user
         self.user_repository.append_profile_to_user(profile, user)

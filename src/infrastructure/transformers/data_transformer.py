@@ -2,7 +2,6 @@ import re
 import time
 import traceback
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
 
 from dateutil import parser as date_parser
 
@@ -38,10 +37,10 @@ class DataTransformer(IDataTransformer):
     resilient against missing fields, malformed data, and API changes.
     """
 
-    def __init__(self, logger, settings: Settings, file_service=None):
+    def __init__(self, logger: ILogger, settings: Settings, file_service: IFileService):
         self.logger: ILogger = logger
         self.settings: Settings = settings
-        self.file_service: Optional[IFileService] = file_service
+        self.file_service: IFileService = file_service
 
     def _safe_get(self, data: Dict[str, Any], key: str, default: Any = None) -> Any:
         """Safely retrieve a value from a dictionary, returning default if key doesn't exist."""
@@ -68,55 +67,6 @@ class DataTransformer(IDataTransformer):
         sanitized = re.sub(r"[^a-zA-Z0-9]", "_", starting_string.lower())
         sanitized = re.sub(r"_+", "_", sanitized)
         return f"{sanitized.strip('_')}_logo"
-
-    async def _process_image_url(
-        self,
-        image_url: str,
-        path_prefix: str,
-        is_authenticated: bool = True,
-        filename: Optional[str] = None,
-    ) -> str | None:
-        """
-        Process an image URL - if it's a LinkedIn URL, download and upload to our storage
-        For unauthenticated users, no image processing is performed.
-        For authenticated users, images are stored in a folder with the user's ID.
-
-        Args:
-            image_url: The image URL to process
-            is_authenticated: Whether the user is authenticated
-            path_prefix: The path prefix for the file (if available)
-            filename: The filename for the file (if available)
-
-        Returns:
-            The file path in storage (not the public URL) or None
-        """
-        if not image_url or not self.file_service:
-            return None
-
-        # Skip image processing for unauthenticated users
-        if not is_authenticated:
-            return None
-
-        try:
-            parsed_url = urlparse(image_url)
-
-            if parsed_url.netloc in self.settings.LINKEDIN_MEDIA_DOMAINS:
-                image_download = await self.file_service.download_remote_image(
-                    image_url
-                )
-                if image_download:
-                    if filename:
-                        image_download.filename = filename
-                    # Use user_id as path prefix for authenticated users
-                    uploaded_file_path = await self.file_service.upload_file(
-                        file=image_download,
-                        path_prefix=path_prefix,
-                    )
-                    return uploaded_file_path
-
-        except Exception as e:
-            self.logger.error(f"Error processing image URL: {str(e)}")
-            return None
 
     def __extract_date_info(self, caption: str) -> tuple:
         """Helper to extract start date, end date and duration from caption."""
@@ -165,6 +115,37 @@ class DataTransformer(IDataTransformer):
             )
             return "", ""
 
+    async def _process_profile_picture(
+        self, data: dict, path_prefix: str, is_authenticated: bool = True
+    ) -> str | None:
+        """Process the profile picture URL."""
+        all_profile_pics: list[dict[str, str]] = data.get("profilePicAllDimensions", [])
+        profile_pic_url = data.get("profilePic", "")
+        preferred_dimensions = [800, 400, 200, 100]
+
+        if all_profile_pics:
+            # Try to find profile pic with preferred dimensions in order of preference
+            for width in preferred_dimensions:
+                for pic in all_profile_pics:
+                    if pic.get("width") == width and pic.get("url"):
+                        profile_pic_url = pic.get("url")
+                        break
+                if profile_pic_url != data.get("profilePic", ""):
+                    break
+
+        profile_pic_path = (
+            await self.file_service.download_and_store_file(
+                profile_pic_url,
+                path_prefix=path_prefix,
+                filename="profile_picture",
+            )
+            if is_authenticated and profile_pic_url
+            else profile_pic_url
+        )
+        self.logger.debug(f"Processed profile picture: {profile_pic_path}")
+
+        return profile_pic_path
+
     async def __format_experience(
         self,
         exp: dict,
@@ -189,12 +170,15 @@ class DataTransformer(IDataTransformer):
             companyName = exp.get("title", "").strip()
 
             # Process company logo
-            company_logo_url = exp.get("logo", "")
-            processed_logo_url = await self._process_image_url(
-                company_logo_url,
-                path_prefix=path_prefix,
-                is_authenticated=is_authenticated,
-                filename=self._get_snake_case_file_name(companyName),
+            company_logo_url: str = exp.get("logo", "")
+            processed_logo_url = (
+                await self.file_service.download_and_store_file(
+                    company_logo_url,
+                    path_prefix=path_prefix,
+                    filename=self._get_snake_case_file_name(companyName),
+                )
+                if is_authenticated
+                else company_logo_url
             )
 
             # Handle experiences with multiple positions (breakdown=true)
@@ -329,12 +313,15 @@ class DataTransformer(IDataTransformer):
                 return None
 
             # Process school logo
-            school_logo_url = edu.get("logo", "")
-            processed_logo_url = await self._process_image_url(
-                school_logo_url,
-                is_authenticated=is_authenticated,
-                path_prefix=path_prefix,
-                filename=self._get_snake_case_file_name(eduName),
+            school_logo_url: str = edu.get("logo", "")
+            processed_logo_url = (
+                await self.file_service.download_and_store_file(
+                    school_logo_url,
+                    path_prefix=path_prefix,
+                    filename=self._get_snake_case_file_name(eduName),
+                )
+                if is_authenticated
+                else school_logo_url
             )
 
             # Extract date info
@@ -417,12 +404,15 @@ class DataTransformer(IDataTransformer):
             orgName = vol.get("subtitle", "").strip()
 
             # Process organization logo
-            org_logo_url = vol.get("logo", "")
-            processed_logo_url = await self._process_image_url(
-                org_logo_url,
-                is_authenticated=is_authenticated,
-                path_prefix=path_prefix,
-                filename=self._get_snake_case_file_name(orgName),
+            org_logo_url: str = vol.get("logo", "")
+            processed_logo_url = (
+                await self.file_service.download_and_store_file(
+                    org_logo_url,
+                    path_prefix=path_prefix,
+                    filename=self._get_snake_case_file_name(orgName),
+                )
+                if is_authenticated
+                else org_logo_url
             )
 
             start_date, end_date, _ = self.__extract_date_info(vol.get("caption", ""))
@@ -507,13 +497,16 @@ class DataTransformer(IDataTransformer):
                                 and "thumbnail" in desc
                             ):
                                 thumbnailUrl = desc.get("thumbnail", "")
-                                thumbnail_path = await self._process_image_url(
-                                    thumbnailUrl,
-                                    is_authenticated=is_authenticated,
-                                    path_prefix=path_prefix,
-                                    filename=self._get_snake_case_file_name(
-                                        projectName
-                                    ),
+                                thumbnail_path = (
+                                    await self.file_service.download_and_store_file(
+                                        thumbnailUrl,
+                                        path_prefix=path_prefix,
+                                        filename=self._get_snake_case_file_name(
+                                            projectName
+                                        ),
+                                    )
+                                    if is_authenticated
+                                    else thumbnailUrl
                                 )
 
             return Project(
@@ -615,15 +608,8 @@ class DataTransformer(IDataTransformer):
                 languages = self.__format_languages(linkedin_data.get("languages", []))
 
                 # Process profile picture
-                profile_pic_url = linkedin_data.get("profilePic", "")
-                processed_profile_pic_url = await self._process_image_url(
-                    profile_pic_url,
-                    is_authenticated=is_authenticated,
-                    path_prefix=file_path_prefix,
-                    filename="profile_picture",
-                )
-                self.logger.debug(
-                    f"Processed profile picture URL: {processed_profile_pic_url}"
+                profile_pic_path = await self._process_profile_picture(
+                    linkedin_data, file_path_prefix, is_authenticated
                 )
 
                 # Build profile data with safe defaults
@@ -631,13 +617,17 @@ class DataTransformer(IDataTransformer):
                     "username": username,
                     "firstName": linkedin_data.get("firstName", ""),
                     "lastName": linkedin_data.get("lastName", ""),
-                    "profilePictureUrl": processed_profile_pic_url,
+                    "profilePictureUrl": profile_pic_path,
                     "jobTitle": linkedin_data.get("headline", ""),
                     "headline": linkedin_data.get("headline", ""),
                     "about": linkedin_data.get("about", ""),
                     "email": None,
                     "phone": None,
-                    "website": linkedin_data.get("creatorWebsite", {}).get("link", "") if isinstance(linkedin_data.get("creatorWebsite"), dict) else "",
+                    "website": (
+                        linkedin_data.get("creatorWebsite", {}).get("link", "")
+                        if isinstance(linkedin_data.get("creatorWebsite"), dict)
+                        else ""
+                    ),
                     "location": linkedin_data.get("addressWithCountry", ""),
                     "languages": languages,
                     "experiences": [

@@ -33,7 +33,7 @@ class UserRepository(IUserRepository):
     @handle_exceptions()
     def append_profile_to_user(self, profile: Profile, user: User) -> User:
         try:
-            self.logger.debug(f"Appending profile to user: {profile}")
+            self.logger.debug(f"Appending profile {profile.username} to user: {user.id}")
             User.objects(id=user.id).update_one(push__profiles=profile)  # type: ignore
             return user.save()
         except Exception as e:

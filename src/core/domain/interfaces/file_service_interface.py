@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from src.core.domain.models.file import File, SignedUrl
+from src.core.domain.dtos import SignedUrl
 
 
 class IFileService(ABC):
@@ -79,49 +79,22 @@ class IFileService(ABC):
         pass
 
     @abstractmethod
-    async def validate_file(self, file_type: str, file_size: int) -> bool:
-        """
-        Validate file type and size
-
-        Args:
-            file_type: MIME type of the file
-            file_size: Size of the file in bytes
-
-        Returns:
-            True if file is valid, False otherwise
-        """
-        pass
-
-    @abstractmethod
-    async def download_remote_image(self, image_url: str) -> Optional[File]:
-        """
-        Download an image from a remote URL
-
-        Args:
-            image_url: URL of the remote image
-
-        Returns:
-            The file or None if failed
-        """
-        pass
-
-    @abstractmethod
-    async def upload_file(
+    async def download_and_store_file(
         self,
-        file: File,
-        bucket_name: Optional[str] = None,
-        path_prefix: str = "",
-    ) -> str:
+        url: str | None,
+        path_prefix: str,
+        filename: Optional[str] = None,
+    ) -> str | None:
         """
-        Upload a file to the file storage
+        Download a file from a URL and upload it to file storage
 
         Args:
-            file: The file to upload
-            bucket_name: Optional bucket name to store the file
-            path_prefix: Optional directory prefix to store the file (e.g. user ID)
+            url: The URL to download the file from
+            path_prefix: used to create the path in storage
+            filename: overwrites the filename of the downloaded file if provided
 
         Returns:
-            The path of the uploaded file or None if failed
+            The file path in storage or None
         """
         pass
 

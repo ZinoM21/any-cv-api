@@ -26,18 +26,22 @@ from src.infrastructure.exceptions import (
 
 class AuthService(IAuthService):
     def __init__(
-        self, user_repository: IUserRepository, logger: ILogger, settings: Settings
+        self,
+        user_repository: IUserRepository,
+        crypto_context: CryptContext,
+        logger: ILogger,
+        settings: Settings,
     ):
         self.user_repository = user_repository
+        self.crypto_context = crypto_context
         self.logger = logger
-        self.pwd_context = CryptContext(schemes=["bcrypt"])
         self.settings = settings
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        return self.pwd_context.verify(plain_password, hashed_password)
+        return self.crypto_context.verify(plain_password, hashed_password)
 
     def get_password_hash(self, password: str) -> str:
-        return self.pwd_context.hash(password)
+        return self.crypto_context.hash(password)
 
     def encode_with_expiry(self, data: dict, expires_in_minutes: int) -> str:
         data.update(

@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.core.domain.models.file import SignedUrl
+from src.core.domain.dtos import SignedUrl
 from src.deps import CurrentUserDep, FileServiceDep
 from src.infrastructure.exceptions import handle_exceptions
 
