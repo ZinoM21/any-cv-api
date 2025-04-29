@@ -64,10 +64,17 @@ class AuthService(IAuthService):
         )
 
     def create_tokens(self, user: User, type: Optional[str] = None) -> dict:
-        data_to_encode = {
-            "sub": str(user.id),
-            "email": user.email,
-        }
+        if user.firstName or user.lastName:
+            data_to_encode = {
+                "sub": str(user.id),
+                "email": user.email,
+                "name": (f"{user.firstName or ''} {user.lastName or ''}").strip(),
+            }
+        else:
+            data_to_encode = {
+                "sub": str(user.id),
+                "email": user.email,
+            }
 
         if type == "refresh":
             return {
