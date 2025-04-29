@@ -186,7 +186,9 @@ class DataTransformer(IDataTransformer):
                 positions = []
 
                 # For multiple positions, the shared location is in the experience's caption
-                company_location = exp.get("caption", "").strip()
+                location, work_setting = self.__extract_location_work_setting(
+                    exp.get("caption", "")
+                )
 
                 for pos in exp.get("subComponents", []):
                     if not pos.get("title"):  # Skip entries without title
@@ -208,9 +210,6 @@ class DataTransformer(IDataTransformer):
                                 ):
                                     description += desc.get("text", "") + " "
 
-                    # For multiple positions, work setting is in the position's metadata
-                    work_setting = pos.get("metadata", "").strip()
-
                     # Get additional role information from subtitle if available
                     role_subtitle = pos.get("subtitle", "")
                     full_title = pos.get("title", "")
@@ -224,7 +223,7 @@ class DataTransformer(IDataTransformer):
                             endDate=end_date,
                             duration=duration,
                             description=description.strip(),
-                            location=company_location,
+                            location=location,
                             workSetting=work_setting,
                         )
                     )
