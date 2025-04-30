@@ -5,7 +5,7 @@ from .file import (
     SignedUrlRequest,
     SignedUrlsRequest,
 )
-from .profile import PublishingOptionsUpdate, UpdateProfile
+from .profile import CreateProfile, PublishingOptionsUpdate, UpdateProfile
 from .token import AccessResponse, RefreshRequest, TokensResponse
 from .user import (
     UserCreate,

@@ -12,7 +12,7 @@ from src.core.domain.dtos import (
 from src.deps import CurrentUserDep, FileServiceDep
 from src.infrastructure.exceptions import handle_exceptions
 
-file_controller_v1 = APIRouter(prefix="/v1/files")
+file_controller_v1 = APIRouter(prefix="/v1/files", tags=["files"])
 
 
 @file_controller_v1.get("/healthz")

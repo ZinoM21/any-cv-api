@@ -85,3 +85,7 @@ class UpdateProfile(BaseModel):
     volunteering: Optional[List[VolunteeringExperienceUpdate]] = None
     projects: Optional[List[ProjectUpdate]] = None
     publishingOptions: Optional[PublishingOptionsUpdate] = None
+
+
+class CreateProfile(BaseModel):
+    turnstileToken: Optional[Str255] = None

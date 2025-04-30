@@ -47,7 +47,7 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return await func(*args, **kwargs)
-                except (RequestValidationError,):
+                except RequestValidationError:
                     # Re-raise these exceptions directly
                     raise
                 except (HTTPException, UnauthorizedHTTPException) as exc:
@@ -71,13 +71,16 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return func(*args, **kwargs)
-                except (
-                    UnauthorizedHTTPException,
-                    HTTPException,
-                    RequestValidationError,
-                ):
+                except RequestValidationError:
                     # Re-raise these exceptions directly
                     raise
+                except (HTTPException, UnauthorizedHTTPException) as exc:
+                    # Add an origin to HTTPExceptions
+                    raise HTTPExceptionWithOrigin(
+                        status_code=exc.status_code,
+                        detail=exc.detail,
+                        origin=exception_origin,
+                    )
                 except (Exception, UncaughtException) as e:
                     # All other exceptions are considered uncaught
                     raise UncaughtException(origin=exception_origin, detail=str(e))

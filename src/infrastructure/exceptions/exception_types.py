@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class ApiErrorType(Enum):
+    BadRequest = "bad_request"
     Unauthorized = "unauthorized"
     Forbidden = "forbidden"
     TokenExpired = "token_expired"

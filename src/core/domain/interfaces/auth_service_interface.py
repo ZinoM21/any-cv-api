@@ -24,3 +24,19 @@ class IAuthService(ABC):
     async def refresh_token(self, refresh_token: str) -> AccessResponse:
         """Refresh access token"""
         pass
+
+    @abstractmethod
+    async def verify_turnstile(self, token: str, remote_ip: str | None = None) -> bool:
+        """Verify a Turnstile token
+
+        Args:
+            token: The token to verify
+            remote_ip: Optional IP address of the user
+
+        Returns:
+            bool: True if verification was successful
+
+        Raises:
+            HTTPException: If verification fails
+        """
+        pass

@@ -47,7 +47,7 @@ class ProfileService:
         self.logger = logger
         self.settings = settings
 
-    def _extract_username(self, link: str) -> str:
+    def extract_username(self, link: str) -> str:
         """Extract and validate LinkedIn username from URL or direct input"""
         username = link.strip()
 
@@ -207,7 +207,7 @@ class ProfileService:
         return new_paths
 
     @handle_exceptions()
-    async def _create_profile_for_user_from_remote_data(
+    async def create_profile_for_user_from_remote_data(
         self, username: str, user: User
     ) -> dict:
         """Handle profile retrieval/creation for authenticated users"""
@@ -245,7 +245,7 @@ class ProfileService:
         return profile.to_mongo().to_dict()
 
     @handle_exceptions()
-    async def _create_guest_profile_from_remote_data(self, username: str) -> dict:
+    async def create_guest_profile_from_remote_data(self, username: str) -> dict:
         """Handle profile retrieval/creation for guest users"""
         # Check cache / db first
         cached_profile = self.profile_cache_repository.find_by_username(username)
@@ -282,22 +282,6 @@ class ProfileService:
         self.logger.debug(f"Guest profile record created for: {username}")
 
         return guest_profile.to_mongo().to_dict()
-
-    # Public methods
-    @handle_exceptions()
-    async def create_profile_from_remote_data(
-        self, link: str, user: Optional[User] = None
-    ) -> dict:
-        """Create a profile by username with data from data broker. Uses db as cache."""
-        username = self._extract_username(link)
-        self.logger.debug(f"Extracted username: {username}")
-
-        is_authenticated = user is not None
-
-        if is_authenticated:
-            return await self._create_profile_for_user_from_remote_data(username, user)
-
-        return await self._create_guest_profile_from_remote_data(username)
 
     @handle_exceptions()
     async def get_profile(self, username: str, user: Optional[User] = None) -> dict:

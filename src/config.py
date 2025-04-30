@@ -41,26 +41,24 @@ class Settings(BaseSettings):
 
     # Auth
     AUTH_SECRET: str
+    TURNSTILE_SECRET_KEY: str
+    TURNSTILE_CHALLENGE_URL: str = (
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    )
     ACCESS_TOKEN_EXPIRES_IN_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRES_IN_MINUTES: int = 60 * 24 * 14  # 2 weeks
     AUTH_ALGORITHM: str = "HS256"
     PUBLIC_PATHS: list[str] = [
         "/healthz",
+        "/docs",
+        "/api/openapi.json",
         "/api/v1/healthz",
-        "/api/v1/profile/published",
+        "/api/v1/profile/",  # This is the most vulnerable path
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh-access",
         "/api/v1/files/public/",
     ]
-    OPTIONAL_PRIVATE_PATHS: list[str] = [
-        "/api/v1/profile/",
-    ]
-
-    @property
-    def all_public_paths(self) -> list[str]:
-        """All paths that shouldn't return 401 if no auth token is provided"""
-        return self.PUBLIC_PATHS + self.OPTIONAL_PRIVATE_PATHS
 
     model_config = SettingsConfigDict(env_file=".env")
 

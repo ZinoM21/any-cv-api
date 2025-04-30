@@ -27,7 +27,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         is_protected_route = not any(
             request.url.path.startswith(excluded)
-            for excluded in self.settings.all_public_paths
+            for excluded in self.settings.PUBLIC_PATHS
         )
         auth_header = request.headers.get("Authorization")
         has_bearer_token = auth_header and auth_header.startswith("Bearer ")

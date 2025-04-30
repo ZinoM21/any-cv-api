@@ -1,17 +1,22 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, status
 
-from src.core.domain.dtos import PublishingOptionsUpdate, UpdateProfile
+from src.core.domain.dtos import CreateProfile, PublishingOptionsUpdate, UpdateProfile
 from src.deps import (
+    AuthServiceDep,
     CurrentUserDep,
     OptionalCurrentUserDep,
     ProfileServiceDep,
     limiter,
 )
-from src.infrastructure.exceptions import handle_exceptions
+from src.infrastructure.exceptions import (
+    ApiErrorType,
+    handle_exceptions,
+)
 
 profile_controller_v1 = APIRouter(prefix="/v1/profile", tags=["profile"])
 
 
+# PUBLIC ROUTES
 @profile_controller_v1.get("/healthz")
 async def healthz():
     return {"status": "ok"}
@@ -42,6 +47,7 @@ async def get_published_profile(
     return await profile_service.get_published_profile(slug)
 
 
+# OPTIONAL AUTH ROUTES
 @profile_controller_v1.get("/{username}")
 @handle_exceptions()
 async def get_profile(
@@ -58,10 +64,49 @@ async def get_profile(
 async def create_profile(
     request: Request,
     username: str,
+    turnstile_data: CreateProfile,
     profile_service: ProfileServiceDep,
+    auth_service: AuthServiceDep,
     user: OptionalCurrentUserDep,
 ):
-    return await profile_service.create_profile_from_remote_data(username, user)
+    """
+    Create a profile by username with data from data broker. Uses db as cache.
+
+    Args:
+        link: The LinkedIn profile link or username
+        user: Optional authenticated user
+        turnstile_token: The Turnstile verification token
+        remote_ip: The IP address of the request
+
+    Returns:
+        The created profile
+    """
+    remote_ip = request.client.host if request.client else None
+    username = profile_service.extract_username(username)
+
+    is_authenticated = user is not None
+
+    if is_authenticated:
+        return await profile_service.create_profile_for_user_from_remote_data(
+            username, user
+        )
+    else:
+        if not turnstile_data.turnstileToken:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=ApiErrorType.Unauthorized.value,
+            )
+
+        is_verified = await auth_service.verify_turnstile(
+            turnstile_data.turnstileToken, remote_ip
+        )
+        if not is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=ApiErrorType.Unauthorized.value,
+            )
+
+        return await profile_service.create_guest_profile_from_remote_data(username)
 
 
 @profile_controller_v1.patch("/{username}")
@@ -75,6 +120,7 @@ async def update_profile(
     return await profile_service.update_profile(username, profile_data, user)
 
 
+# REQUIRED AUTH ROUTES
 @profile_controller_v1.delete("/{username}")
 @handle_exceptions()
 async def delete_profile(

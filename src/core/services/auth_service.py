@@ -3,7 +3,9 @@ from typing import Optional
 from uuid import UUID
 
 import jwt
+import requests
 from fastapi import HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from jwt import ExpiredSignatureError, InvalidTokenError
 from passlib.context import CryptContext
 
@@ -155,3 +157,81 @@ class AuthService(IAuthService):
 
         new_access_token = self.create_tokens(user, "refresh")
         return AccessResponse(**new_access_token)
+
+    @handle_exceptions()
+    async def verify_turnstile(self, token: str, remote_ip: str | None = None) -> bool:
+        """
+        Verify a Turnstile token againt an external service
+
+        Args:
+            token: The token to verify
+            remote_ip: Optional IP address of the user
+
+        Returns:
+            bool: True if verification was successful
+
+        Raises:
+            HTTPException: If verification fails
+        """
+        if not token:
+            raise HTTPException(status_code=400, detail="Missing Turnstile token")
+
+        data = {
+            "secret": self.settings.TURNSTILE_SECRET_KEY,
+            "response": token,
+        }
+
+        if remote_ip:
+            data["remoteip"] = remote_ip
+
+        try:
+            response = requests.post(self.settings.TURNSTILE_CHALLENGE_URL, json=data)
+
+            verify_response = response.json()
+            if not verify_response.get("success"):
+                error_codes = verify_response.get("error-codes") or []
+                self.logger.error(f"Turnstile verification failed: {error_codes}")
+                if (
+                    "invalid-input-response" in error_codes
+                    or "missing-input-response" in error_codes
+                ):
+                    raise RequestValidationError(
+                        errors=[
+                            {
+                                "loc": ["body", "turnstileToken"],
+                                "msg": "Turnstile token is invalid",
+                            }
+                        ]
+                    )
+                elif "bad-request" in error_codes:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=ApiErrorType.BadRequest.value,
+                    )
+                elif "timeout-or-duplicate" in error_codes:
+                    raise RequestValidationError(
+                        errors=[
+                            {
+                                "loc": ["body", "turnstileToken"],
+                                "msg": "Turnstile token already used",
+                            }
+                        ]
+                    )
+                elif "internal-error" in error_codes:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail=ApiErrorType.ServiceUnavailable.value,
+                    )
+                else:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=ApiErrorType.InternalServerError.value,
+                    )
+
+            self.logger.debug("Request validated against Turnstile")
+            return True
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Failed to verify Turnstile token: {str(e)}"
+            )
