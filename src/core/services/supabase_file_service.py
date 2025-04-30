@@ -273,6 +273,7 @@ class SupabaseFileService(IFileService):
         file_type: str,
         file_size: int,
         user_id: str,
+        public: bool = False,
     ) -> SignedUrl:
         """
         Generate a signed URL for file upload
@@ -306,7 +307,7 @@ class SupabaseFileService(IFileService):
                 )
 
             response = self.supabase_service.storage.from_(
-                self.private_bucket_name
+                self.private_bucket_name if not public else self.public_bucket_name
             ).create_signed_upload_url(filename)
 
             return SignedUrl(url=response["signedUrl"], path=response["path"])

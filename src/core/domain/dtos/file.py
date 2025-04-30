@@ -1,4 +1,21 @@
+from typing import List
+
 from pydantic import BaseModel
+
+
+class SignedUploadUrlRequest(BaseModel):
+    file_name: str
+    file_type: str
+    file_size: int
+    public: bool = False
+
+
+class SignedUrlRequest(BaseModel):
+    file_path: str
+
+
+class SignedUrlsRequest(BaseModel):
+    file_paths: List[str]
 
 
 class File(BaseModel):

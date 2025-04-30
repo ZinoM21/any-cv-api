@@ -42,6 +42,7 @@ class IFileService(ABC):
         file_type: str,
         file_size: int,
         user_id: str,
+        public: bool = False,
     ) -> SignedUrl:
         """
         Generate a signed URL for file upload
@@ -51,6 +52,7 @@ class IFileService(ABC):
             file_type: MIME type of the file
             file_size: Size of the file in bytes
             user_id: ID of the user requesting the signed URL
+            public: Whether the file is public
 
         Returns:
             SignedUrl containing the signed URL
