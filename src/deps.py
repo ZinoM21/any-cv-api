@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Annotated, Optional
 
 from fastapi import Depends, Request
+from passlib.context import CryptContext
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -16,7 +17,7 @@ from src.core.domain.interfaces import (
     IRemoteDataSource,
     IUserRepository,
 )
-from src.core.domain.models.user import User
+from src.core.domain.models import User
 from src.core.services import AuthService, ProfileService
 from src.core.services.supabase_file_service import SupabaseFileService
 from src.infrastructure.database import (
@@ -41,6 +42,14 @@ def get_settings():
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+
+
+def get_crypto_context():
+    return CryptContext(schemes=["bcrypt"])
+
+
+CryptoContextDep = Annotated[CryptContext, Depends(get_crypto_context)]
+
 
 # Limits
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
@@ -134,10 +143,11 @@ ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 # Auth
 def get_auth_service(
     user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
+    crypto_context: CryptoContextDep,
     logger: LoggerDep,
     settings: SettingsDep,
 ) -> IAuthService:
-    return AuthService(user_repository, logger, settings)
+    return AuthService(user_repository, crypto_context, logger, settings)
 
 
 AuthServiceDep = Annotated[IAuthService, Depends(get_auth_service)]
