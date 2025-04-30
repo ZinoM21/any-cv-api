@@ -142,7 +142,8 @@ class DataTransformer(IDataTransformer):
             if is_authenticated and profile_pic_url
             else profile_pic_url
         )
-        self.logger.debug(f"Processed profile picture: {profile_pic_path}")
+        if profile_pic_path is not None and profile_pic_path != "":
+            self.logger.debug(f"Processed profile picture: {profile_pic_path}")
 
         return profile_pic_path
 
