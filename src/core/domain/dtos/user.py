@@ -38,6 +38,25 @@ class VerifyEmailRequest(BaseModel):
     token: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    password: Str255
+    token: Optional[str] = None
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str = (
+        "If your email exists in our system, a password reset link has been sent."
+    )
+
+
+class PasswordResetResponse(BaseModel):
+    email: EmailStr
+
+
 class Email(resend.Email):
     pass
 

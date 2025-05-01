@@ -41,7 +41,8 @@ class Settings(BaseSettings):
 
     # Email
     RESEND_API_KEY: str
-    EMAIL_FROM: str = "hey@buildanycv.com"
+    RESEND_FROM_EMAIL: str
+    RESEND_TO_EMAIL: str | None = None
     EMAIL_VERIFICATION_EXPIRES_IN_HOURS: int = 24
 
     # Auth
@@ -58,13 +59,10 @@ class Settings(BaseSettings):
         "/docs",
         "/api/openapi.json",
         "/api/v1/healthz",
-        "/api/v1/profile/",  # This is the most vulnerable path
-        "/api/v1/auth/login",
-        "/api/v1/auth/register",
-        "/api/v1/auth/refresh-access",
-        "/api/v1/auth/verify-email",
+        "/api/v1/profile/",
+        "/api/v1/auth/",
         "/api/v1/files/public/",
-    ]
+    ]  # We define them here as "public", but protected data is always secured through user authentication
 
     model_config = SettingsConfigDict(env_file=".env")
 

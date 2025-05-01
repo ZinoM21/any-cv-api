@@ -21,3 +21,19 @@ class IEmailService(ABC):
             bool: True if the email was sent successfully
         """
         pass
+
+    @abstractmethod
+    async def send_password_reset_email(
+        self, email: str, token: str, name: str = ""
+    ) -> Email:
+        """Send a password reset email to a user.
+
+        Args:
+            email: The recipient's email address
+            token: The password reset token
+            name: The recipient's name
+
+        Returns:
+            Email: The email object if sent successfully
+        """
+        pass

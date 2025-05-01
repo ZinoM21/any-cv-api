@@ -22,14 +22,14 @@ class ResendEmailService(IEmailService):
         self.logger = logger
         self.settings = settings
         self.frontend_url = settings.FRONTEND_URL
-        self.email_from = settings.EMAIL_FROM
+        self.email_from = settings.RESEND_FROM_EMAIL
+        self.email_to = settings.RESEND_TO_EMAIL
 
         resend.api_key = settings.RESEND_API_KEY
 
     @handle_exceptions(origin="ResendEmailService._send_email")
     async def _send_email(
         self,
-        from_email: str,
         to_email: Union[str, List[str]],
         subject: str,
         html_content: Optional[str] = None,
@@ -45,7 +45,6 @@ class ResendEmailService(IEmailService):
         """Send a general email using Resend.
 
         Args:
-            from_email: The sender's email address
             to_email: The recipient's email address
             subject: The email subject
             html_content: The HTML content of the email
@@ -65,8 +64,8 @@ class ResendEmailService(IEmailService):
         """
 
         params: resend.Emails.SendParams = {
-            "from": from_email,
-            "to": to_email,
+            "from": f"Zino from BuildAnyCV <{self.email_from}>",
+            "to": self.email_to or to_email,
             "subject": subject,
         }
 
@@ -138,10 +137,110 @@ class ResendEmailService(IEmailService):
         """
 
         verification_email = await self._send_email(
-            from_email=f"Zino from BuildAnyCV <{self.email_from}>",
             to_email=email,
             subject="Confirm your BuildAnyCV account",
             html_content=html_content,
         )
         self.logger.debug(f"Verification email sent to {email}.")
         return verification_email
+
+    @handle_exceptions(origin="ResendEmailService.send_password_reset_email")
+    async def send_password_reset_email(
+        self, email: str, token: str, name: str = ""
+    ) -> Email:
+        """Send a password reset email to a user.
+
+        Args:
+            email: The recipient's email address
+            token: The password reset token
+            name: The recipient's name
+
+        Returns:
+            Email: The email object if sent successfully
+        """
+        reset_url = f"{self.frontend_url}/reset-password?token={token}"
+
+        html_content = f"""
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <tr>
+                    <td style="padding: 20px;">
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td style="padding-bottom: 20px;">
+                                    <h2 style="margin: 0; color: #111827;">Reset Your Password, {name}</h2>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 20px;">
+                                    <p style="margin: 0; color: #4B5563;">We received a request to reset your password. Click the button below to create a new password:</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 20px;">
+                                    <table cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="background-color: #4F46E5; border-radius: 6px; padding: 10px 16px;">
+                                                <a href="{reset_url}" style="color: #FFFFFF; text-decoration: none; font-weight: 600; display: inline-block;">Reset Password</a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 10px;">
+                                    <p style="margin: 0; color: #4B5563;">If you didn't request a password reset, you can safely ignore this email.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 20px;">
+                                    <p style="margin: 0; color: #4B5563;">This link will expire in {self.settings.EMAIL_VERIFICATION_EXPIRES_IN_HOURS} hours.</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 10px;">
+                                    <p style="margin: 0; color: #4B5563;">Best regards,</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-bottom: 20px;">
+                                    <p style="margin: 0; color: #4B5563;">Zino from BuildAnyCV</p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="border-top: 1px solid #E5E7EB; padding-top: 20px;">
+                                    <p style="margin: 0; color: #6B7280; font-size: 12px;">Copyright © 2025 BuildAnyCV</p>
+                                    <p style="margin: 6px 0 0; color: #6B7280; font-size: 10px;">This email was sent to {email}</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        """
+
+        text_content = f"""
+        Reset Your Password, {name}
+        
+        We received a request to reset your password. Please visit the link below to create a new password:
+        
+        {reset_url}
+        
+        If you didn't request a password reset, you can safely ignore this email.
+        
+        This link will expire in {self.settings.EMAIL_VERIFICATION_EXPIRES_IN_HOURS} hours.
+        
+        Best regards,
+        Zino from BuildAnyCV
+        
+        Copyright © 2025 BuildAnyCV
+        This email was sent to {email}
+        """
+
+        reset_email = await self._send_email(
+            to_email=email,
+            subject="Reset Your BuildAnyCV Password",
+            html_content=html_content,
+            text_content=text_content,
+        )
+        self.logger.debug(f"Password reset email sent to {email}.")
+        return reset_email

@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 
 from src.core.domain.dtos import (
     AccessResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    PasswordResetResponse,
     TokensResponse,
     UserCreate,
     UserLogin,
@@ -53,5 +56,43 @@ class IAuthService(ABC):
 
         Raises:
             HTTPException: If verification fails
+        """
+        pass
+
+    @abstractmethod
+    async def forgot_password(
+        self, request: ForgotPasswordRequest
+    ) -> ForgotPasswordResponse:
+        """Initiates the password reset process
+
+        Args:
+            request: The forgot password request
+
+        Returns:
+            ForgotPasswordResponse: Response confirming the request was processed
+
+        Raises:
+            HTTPException: If there's an error processing the request
+        """
+        pass
+
+    @abstractmethod
+    async def reset_password(
+        self,
+        user_id: str | None = None,
+        token: str | None = None,
+        new_password: str | None = None,
+    ) -> PasswordResetResponse:
+        """Resets a user's password after verifying the old password
+
+        Args:
+            user_id: The ID of the user
+            new_password: The new password
+            token: The token to reset the password
+        Returns:
+            PasswordResetResponse: A response object with a standard message
+
+        Raises:
+            HTTPException: If the old password is invalid or user not found
         """
         pass

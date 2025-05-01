@@ -10,6 +10,10 @@ from .token import AccessResponse, RefreshRequest, TokensResponse
 from .user import (
     Attachment,
     Email,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    PasswordResetResponse,
+    ResetPasswordRequest,
     Tag,
     UserCreate,
     UserLogin,

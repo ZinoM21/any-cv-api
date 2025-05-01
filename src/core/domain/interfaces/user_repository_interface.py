@@ -20,6 +20,10 @@ class IUserRepository(ABC):
         pass
 
     @abstractmethod
+    def find_by_password_reset_token(self, token: str) -> Optional[User]:
+        pass
+
+    @abstractmethod
     def create(self, user: dict) -> User:
         pass
 

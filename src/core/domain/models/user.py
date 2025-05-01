@@ -28,5 +28,7 @@ class User(Document):
     email_verified = BooleanField(default=False)
     verification_token = StringField()
     verification_token_expires = DateTimeField()
+    password_reset_token = StringField()
+    password_reset_token_expires = DateTimeField()
 
     meta = {"collection": "users", "indexes": ["email"]}

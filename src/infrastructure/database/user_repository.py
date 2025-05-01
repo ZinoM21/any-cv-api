@@ -38,6 +38,16 @@ class UserRepository(IUserRepository):
             return None
 
     @handle_exceptions()
+    def find_by_password_reset_token(self, token: str) -> Optional[User]:
+        try:
+            return User.objects(  # type: ignore
+                password_reset_token=token,
+                password_reset_token_expires__gt=datetime.now(timezone.utc),
+            ).first()
+        except DoesNotExist:
+            return None
+
+    @handle_exceptions()
     def create(self, user: dict) -> User:
         return User(**user).save()
 

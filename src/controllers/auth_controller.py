@@ -2,14 +2,17 @@ from fastapi import APIRouter, HTTPException, status
 
 from src.core.domain.dtos import (
     AccessResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     RefreshRequest,
+    ResetPasswordRequest,
     TokensResponse,
     UserCreate,
     UserLogin,
     UserResponse,
     VerifyEmailRequest,
 )
-from src.deps import AuthServiceDep
+from src.deps import AuthServiceDep, OptionalCurrentUserDep
 from src.infrastructure.exceptions import (
     ApiErrorType,
     UnauthorizedHTTPException,
@@ -53,3 +56,27 @@ async def verify_email(req: VerifyEmailRequest, auth_service: AuthServiceDep):
         )
 
     return {"message": "Email verified successfully"}
+
+
+@auth_controller_v1.post("/forgot-password", response_model=ForgotPasswordResponse)
+async def forgot_password(req: ForgotPasswordRequest, auth_service: AuthServiceDep):
+    """Initiate the password reset process for a user."""
+    return await auth_service.forgot_password(req)
+
+
+@auth_controller_v1.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(
+    req: ResetPasswordRequest,
+    auth_service: AuthServiceDep,
+    user: OptionalCurrentUserDep,
+):
+    """Reset a user's password using their old password.
+
+    This endpoint requires authentication and validates the old password
+    before allowing the password to be changed.
+    """
+    return await auth_service.reset_password(
+        user_id=str(user.id) if user else None,
+        token=req.token,
+        new_password=req.password,
+    )

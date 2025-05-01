@@ -14,6 +14,9 @@ from passlib.context import CryptContext
 from src.config import Settings
 from src.core.domain.dtos import (
     AccessResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    PasswordResetResponse,
     TokensResponse,
     UserCreate,
     UserLogin,
@@ -308,3 +311,139 @@ class AuthService(IAuthService):
             )
 
         return True
+
+    @handle_exceptions(origin="AuthService._generate_and_store_password_reset_token")
+    async def _generate_and_store_password_reset_token(self, user: User) -> str:
+        """Generate a random token for password reset and store it in the database.
+
+        Args:
+            user: The user to generate a password reset token for
+
+        Returns:
+            str: The generated token
+
+        Raises:
+            HTTPException: If the user cannot be updated
+        """
+        # 1. Generate a random token
+        alphabet = string.ascii_letters + string.digits
+        token = "".join(secrets.choice(alphabet) for _ in range(64))
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            hours=self.settings.EMAIL_VERIFICATION_EXPIRES_IN_HOURS
+        )
+
+        # 2. Store the token in the database
+        updated_user = self.user_repository.update(
+            user,
+            {"password_reset_token": token, "password_reset_token_expires": expires_at},
+        )
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=ApiErrorType.InternalServerError.value,
+            )
+
+        return token
+
+    @handle_exceptions(origin="AuthService.forgot_password")
+    async def forgot_password(
+        self, request: ForgotPasswordRequest
+    ) -> ForgotPasswordResponse:
+        """Initiate the password reset process for a user.
+
+        Note: For security reasons, this method always returns the same response
+        regardless of whether the email exists or not.
+
+        Args:
+            request: The forgot password request containing the email
+
+        Returns:
+            ForgotPasswordResponse: A response object with a standard message
+        """
+        user = self.user_repository.find_by_email(request.email)
+
+        if user:
+            token = await self._generate_and_store_password_reset_token(user)
+
+            name = f"{user.firstName} {user.lastName}".strip()
+            await self.email_service.send_password_reset_email(
+                str(user.email), token, name
+            )
+
+            self.logger.info(f"Password reset email sent to {user.email}")
+        else:
+            # Log the attempt but don't reveal
+            self.logger.info(
+                f"Password reset requested for non-existent email: {request.email}"
+            )
+
+        return ForgotPasswordResponse()
+
+    @handle_exceptions(origin="AuthService.reset_password")
+    async def reset_password(
+        self,
+        user_id: str | None = None,
+        token: str | None = None,
+        new_password: str | None = None,
+    ) -> PasswordResetResponse:
+        """Reset a user's password after verifying the old password.
+
+        Args:
+            user_id: The ID of the user
+            new_password: The new password
+
+        Returns:
+            PasswordResetResponse: A response object with a standard message
+
+        Raises:
+            HTTPException: If the old password is invalid or user not found
+        """
+        if not new_password:
+            self.logger.error("No new password provided")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ApiErrorType.BadRequest.value,
+            )
+
+        # This endpoint can only be used by an authed user or from a password reset email
+        if user_id:
+            user = self.user_repository.find_by_id(user_id)
+        elif token:
+            user = self.user_repository.find_by_password_reset_token(token)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ApiErrorType.BadRequest.value,
+            )
+
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ApiErrorType.ResourceNotFound.value,
+            )
+
+        # Exception if new is same as old
+        if self._verify_password(new_password, str(user.pw_hash)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ApiErrorType.BadRequest.value,
+            )
+
+        new_hashed_password = self._get_password_hash(new_password)
+        updated_user = self.user_repository.update(
+            user,
+            {
+                "pw_hash": new_hashed_password,
+                "password_reset_token": None,
+                "password_reset_token_expires": None,
+            },
+        )
+
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=ApiErrorType.InternalServerError.value,
+            )
+
+        self.logger.info(f"Password reset successfully for user: {user.email}")
+        return PasswordResetResponse(email=str(user.email))
