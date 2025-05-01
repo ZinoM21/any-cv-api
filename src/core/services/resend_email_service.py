@@ -1,0 +1,147 @@
+from typing import Dict, List, Optional, Union
+
+import resend
+from fastapi import HTTPException, status
+
+from src.config import Settings
+from src.core.domain.dtos import Attachment, Email, Tag
+from src.core.domain.interfaces import IEmailService, ILogger
+from src.infrastructure.exceptions import ApiErrorType, handle_exceptions
+
+
+class ResendEmailService(IEmailService):
+    """Email service that uses Resend API to send emails."""
+
+    def __init__(self, logger: ILogger, settings: Settings):
+        """Initialize the Resend email service.
+
+        Args:
+            logger: Logger instance
+            settings: Application settings
+        """
+        self.logger = logger
+        self.settings = settings
+        self.frontend_url = settings.FRONTEND_URL
+        self.email_from = settings.EMAIL_FROM
+
+        resend.api_key = settings.RESEND_API_KEY
+
+    @handle_exceptions(origin="ResendEmailService._send_email")
+    async def _send_email(
+        self,
+        from_email: str,
+        to_email: Union[str, List[str]],
+        subject: str,
+        html_content: Optional[str] = None,
+        text_content: Optional[str] = None,
+        cc: Optional[Union[List[str], str]] = None,
+        bcc: Optional[Union[List[str], str]] = None,
+        reply_to: Optional[Union[List[str], str]] = None,
+        attachments: Optional[List[Attachment]] = None,
+        tags: Optional[List[Tag]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        scheduled_at: Optional[str] = None,
+    ) -> Email:
+        """Send a general email using Resend.
+
+        Args:
+            from_email: The sender's email address
+            to_email: The recipient's email address
+            subject: The email subject
+            html_content: The HTML content of the email
+            text_content: Optional plain text content
+            cc: Optional string or list of CC recipients
+            bcc: Optional string or list of BCC recipients
+            reply_to: Optional string or list of reply-to email address
+            attachments: Optional list of attachments
+            tags: Optional list of tags
+            headers: Optional dictionary of headers
+            scheduled_at: Optional date and time to schedule the email
+
+        Returns:
+            Email: The email object
+        Raises:
+            HTTPException 500: If the email fails to send
+        """
+
+        params: resend.Emails.SendParams = {
+            "from": from_email,
+            "to": to_email,
+            "subject": subject,
+        }
+
+        optional_params = {
+            "html": html_content,
+            "text": text_content,
+            "cc": cc,
+            "bcc": bcc,
+            "reply_to": reply_to,
+            "attachments": attachments,
+            "tags": tags,
+            "headers": headers,
+            "scheduled_at": scheduled_at,
+        }
+
+        for k, v in optional_params.items():
+            if v is not None:
+                params[k] = v
+
+        try:
+            return resend.Emails.send(params)
+
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=ApiErrorType.InternalServerError.value,
+            )
+
+    @handle_exceptions(origin="ResendEmailService.send_verification_email")
+    async def send_verification_email(
+        self, email: str, token: str, name: str = ""
+    ) -> Email:
+        """Send a verification email to a newly registered user.
+
+        Args:
+            email: The recipient's email address
+            token: The verification token
+            name: The recipient's name
+
+        Returns:
+            Email: The email object if sent successfully
+        """
+        verification_url = f"{self.frontend_url}/verify-email?token={token}"
+
+        html_content = f"""
+            <div>
+                <h2>Welcome to Any CV, {name}!</h1>
+                <p>Thank you for signing up. To complete your registration, please verify your email address by clicking the button below:</p>
+                <div>
+                <a href="{verification_url}" style="display: inline-block; background-color: #4F46E5; color: #FFFFFF; font-weight: 600; padding: 0.5rem 1rem; border-radius: 0.375rem; text-decoration: none;">
+                    Verify Email Address
+                </a>
+            </div>
+            <p>If you didn't create an account, you can safely ignore this email.</p>
+            <p>This link will expire in {self.settings.EMAIL_VERIFICATION_EXPIRES_IN_HOURS} hours.</p>
+
+            <p>Best regards,</p>
+            <p>Zino from BuildAnyCV</p>
+
+            
+            <div style="margin-top: 20px;">
+                <p>Copyright © 2025 BuildAnyCV</p>
+            </div>
+
+            <span style="font-size: 10px; color: #6B7280;">
+                This email was sent to {email}
+            </span>
+        </div>
+        """
+
+        verification_email = await self._send_email(
+            from_email=f"Zino from BuildAnyCV <{self.email_from}>",
+            to_email=email,
+            subject="Confirm your BuildAnyCV account",
+            html_content=html_content,
+        )
+        self.logger.debug(f"Verification email sent to {email}.")
+        return verification_email

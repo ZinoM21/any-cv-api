@@ -40,3 +40,18 @@ class IAuthService(ABC):
             HTTPException: If verification fails
         """
         pass
+
+    @abstractmethod
+    async def verify_email(self, token: str) -> bool:
+        """Verify a user's email with the provided token
+
+        Args:
+            token: The verification token
+
+        Returns:
+            bool: True if verification was successful
+
+        Raises:
+            HTTPException: If verification fails
+        """
+        pass

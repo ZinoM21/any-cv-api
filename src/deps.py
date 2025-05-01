@@ -10,6 +10,7 @@ from src.config import Settings, settings
 from src.core.domain.interfaces import (
     IAuthService,
     IDataTransformer,
+    IEmailService,
     IFileService,
     ILogger,
     IProfileCacheRepository,
@@ -19,6 +20,7 @@ from src.core.domain.interfaces import (
 )
 from src.core.domain.models import User
 from src.core.services import AuthService, ProfileService
+from src.core.services.resend_email_service import ResendEmailService
 from src.core.services.supabase_file_service import SupabaseFileService
 from src.infrastructure.database import (
     Database,
@@ -76,6 +78,14 @@ DatabaseDep = Annotated[Database, Depends(get_db)]
 # External
 def get_linkedin_api(logger: LoggerDep, settings: SettingsDep) -> IRemoteDataSource:
     return LinkedInAPI(logger, settings)
+
+
+# Email
+def get_email_service(logger: LoggerDep, settings: SettingsDep) -> IEmailService:
+    return ResendEmailService(logger, settings)
+
+
+EmailServiceDep = Annotated[IEmailService, Depends(get_email_service)]
 
 
 # Repositories
@@ -144,10 +154,11 @@ ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 def get_auth_service(
     user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
     crypto_context: CryptoContextDep,
+    email_service: EmailServiceDep,
     logger: LoggerDep,
     settings: SettingsDep,
 ) -> IAuthService:
-    return AuthService(user_repository, crypto_context, logger, settings)
+    return AuthService(user_repository, crypto_context, email_service, logger, settings)
 
 
 AuthServiceDep = Annotated[IAuthService, Depends(get_auth_service)]

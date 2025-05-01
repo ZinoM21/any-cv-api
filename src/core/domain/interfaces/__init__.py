@@ -1,5 +1,6 @@
 from .auth_service_interface import IAuthService
 from .data_transformer_interface import IDataTransformer
+from .email_service_interface import IEmailService
 from .file_service_interface import IFileService
 from .logger_interface import ILogger
 from .profile_repository_interface import IProfileCacheRepository, IProfileRepository

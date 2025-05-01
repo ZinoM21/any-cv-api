@@ -8,8 +8,12 @@ from .file import (
 from .profile import CreateProfile, PublishingOptionsUpdate, UpdateProfile
 from .token import AccessResponse, RefreshRequest, TokensResponse
 from .user import (
+    Attachment,
+    Email,
+    Tag,
     UserCreate,
     UserLogin,
     UserResponse,
     UserUpdate,
+    VerifyEmailRequest,
 )

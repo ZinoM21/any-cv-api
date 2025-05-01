@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Optional
 
 from mongoengine import DoesNotExist
@@ -27,13 +28,31 @@ class UserRepository(IUserRepository):
             return None
 
     @handle_exceptions()
+    def find_by_verification_token(self, token: str) -> Optional[User]:
+        try:
+            return User.objects(  # type: ignore
+                verification_token=token,
+                verification_token_expires__gt=datetime.now(timezone.utc),
+            ).first()
+        except DoesNotExist:
+            return None
+
+    @handle_exceptions()
     def create(self, user: dict) -> User:
         return User(**user).save()
 
     @handle_exceptions()
+    def update(self, user: User, data: dict) -> User:
+        for key, value in data.items():
+            setattr(user, key, value)
+        return user.save()
+
+    @handle_exceptions()
     def append_profile_to_user(self, profile: Profile, user: User) -> User:
         try:
-            self.logger.debug(f"Appending profile {profile.username} to user: {user.id}")
+            self.logger.debug(
+                f"Appending profile {profile.username} to user: {user.id}"
+            )
             User.objects(id=user.id).update_one(push__profiles=profile)  # type: ignore
             return user.save()
         except Exception as e:

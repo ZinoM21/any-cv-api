@@ -16,7 +16,15 @@ class IUserRepository(ABC):
         pass
 
     @abstractmethod
+    def find_by_verification_token(self, token: str) -> Optional[User]:
+        pass
+
+    @abstractmethod
     def create(self, user: dict) -> User:
+        pass
+
+    @abstractmethod
+    def update(self, user: User, data: dict) -> User:
         pass
 
     @abstractmethod

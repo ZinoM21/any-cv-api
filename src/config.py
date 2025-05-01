@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # Cache
     CACHE_GUEST_PROFILES_TIME_IN_SECONDS: int = 60 * 60 * 24 * 7  # 1 week
 
+    # Email
+    RESEND_API_KEY: str
+    EMAIL_FROM: str = "hey@buildanycv.com"
+    EMAIL_VERIFICATION_EXPIRES_IN_HOURS: int = 24
+
     # Auth
     AUTH_SECRET: str
     TURNSTILE_SECRET_KEY: str
@@ -57,6 +62,7 @@ class Settings(BaseSettings):
         "/api/v1/auth/login",
         "/api/v1/auth/register",
         "/api/v1/auth/refresh-access",
+        "/api/v1/auth/verify-email",
         "/api/v1/files/public/",
     ]
 

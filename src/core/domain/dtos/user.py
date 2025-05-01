@@ -1,6 +1,7 @@
 from typing import Annotated, Optional
 from uuid import UUID
 
+import resend
 from pydantic import BaseModel, EmailStr, StringConstraints
 
 # Type alias for common string constraint
@@ -30,3 +31,20 @@ class UserResponse(BaseModel):
     email: EmailStr
     firstName: Str255
     lastName: Str255
+    email_verified: bool = False
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class Email(resend.Email):
+    pass
+
+
+class Attachment(resend.Attachment):
+    pass
+
+
+class Tag(resend.Tag):
+    pass

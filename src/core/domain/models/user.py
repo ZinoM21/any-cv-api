@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from mongoengine import (
     PULL,
+    BooleanField,
     DateTimeField,
     Document,
     EmailField,
@@ -24,5 +25,8 @@ class User(Document):
     created_at = DateTimeField(default=datetime.now(timezone.utc))
     updated_at = DateTimeField(default=datetime.now(timezone.utc))
     profiles = ListField(ReferenceField(Profile, reverse_delete_rule=PULL))
+    email_verified = BooleanField(default=False)
+    verification_token = StringField()
+    verification_token_expires = DateTimeField()
 
     meta = {"collection": "users", "indexes": ["email"]}

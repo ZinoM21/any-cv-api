@@ -92,7 +92,7 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not use the fetched data to create a profile",
+                detail=ApiErrorType.InternalServerError.value,
             )
         self.logger.debug(f"Profile data transformed for: {username}")
 
