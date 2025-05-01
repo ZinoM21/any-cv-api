@@ -21,6 +21,7 @@ from src.core.domain.dtos import (
     UserCreate,
     UserLogin,
     UserResponse,
+    UserUpdate,
 )
 from src.core.domain.interfaces import (
     IAuthService,

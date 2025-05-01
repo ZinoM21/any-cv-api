@@ -34,3 +34,7 @@ class IUserRepository(ABC):
     @abstractmethod
     def append_profile_to_user(self, profile: Profile, user: User) -> User:
         pass
+
+    @abstractmethod
+    def delete(self, user: User) -> bool:
+        pass

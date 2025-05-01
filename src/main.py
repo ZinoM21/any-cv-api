@@ -9,6 +9,7 @@ from src.controllers import (
     auth_controller_v1,
     file_controller_v1,
     profile_controller_v1,
+    user_controller_v1,
 )
 from src.deps import (
     Database,
@@ -72,6 +73,7 @@ add_exception_handlers(app, logger)
 app.include_router(profile_controller_v1)
 app.include_router(file_controller_v1)
 app.include_router(auth_controller_v1)
+app.include_router(user_controller_v1)
 
 
 @app.get("/healthz")

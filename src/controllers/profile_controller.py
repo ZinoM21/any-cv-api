@@ -121,7 +121,7 @@ async def update_profile(
 
 
 # REQUIRED AUTH ROUTES
-@profile_controller_v1.delete("/{username}")
+@profile_controller_v1.delete("/{username}", status_code=status.HTTP_204_NO_CONTENT)
 @handle_exceptions()
 async def delete_profile(
     username: str,

@@ -68,3 +68,20 @@ class UserRepository(IUserRepository):
         except Exception as e:
             self.logger.error(f"Error appending profile to user: {e}")
             raise e
+
+    @handle_exceptions()
+    def delete(self, user: User) -> bool:
+        """Delete a user and all associated profiles.
+
+        Args:
+            user: The user to delete
+
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        try:
+            user.delete()
+            return True
+        except Exception as e:
+            self.logger.error(f"Error deleting user and profiles: {e}")
+            return False

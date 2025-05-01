@@ -399,6 +399,21 @@ class ProfileService:
         return None
 
     @handle_exceptions()
+    async def delete_profiles_from_user(self, user: User) -> None:
+        """Delete multiple profiles and all associated files"""
+        profile_ids = [str(p.id) for p in user.profiles]  # type: ignore
+
+        for id in profile_ids:  # type: ignore
+            profile = self.profile_repository.find_by_id(id)
+            if profile:
+                self.profile_repository.delete(profile)
+
+                file_path = f"{user.id}/{profile.username}"
+                await self.file_service.delete_files_from_folder(file_path)
+
+        return None
+
+    @handle_exceptions()
     async def publish_profile(
         self, username: str, data: PublishingOptionsUpdate, user: User
     ) -> dict:

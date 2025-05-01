@@ -19,9 +19,13 @@ from src.core.domain.interfaces import (
     IUserRepository,
 )
 from src.core.domain.models import User
-from src.core.services import AuthService, ProfileService
-from src.core.services.resend_email_service import ResendEmailService
-from src.core.services.supabase_file_service import SupabaseFileService
+from src.core.services import (
+    AuthService,
+    ProfileService,
+    ResendEmailService,
+    SupabaseFileService,
+    UserService,
+)
 from src.infrastructure.database import (
     Database,
     ProfileCacheRepository,
@@ -93,13 +97,23 @@ def get_profile_repository(logger: LoggerDep) -> IProfileRepository:
     return ProfileRepository(logger)
 
 
+ProfileRepositoryDep = Annotated[IProfileRepository, Depends(get_profile_repository)]
+
+
 def get_profile_cache_repository(logger: LoggerDep) -> IProfileCacheRepository:
     return ProfileCacheRepository(logger)
+
+
+ProfileCacheRepositoryDep = Annotated[
+    IProfileCacheRepository, Depends(get_profile_cache_repository)
+]
 
 
 def get_user_repository(logger: LoggerDep) -> IUserRepository:
     return UserRepository(logger)
 
+
+UserRepositoryDep = Annotated[IUserRepository, Depends(get_user_repository)]
 
 # Services
 
@@ -108,7 +122,7 @@ def get_user_repository(logger: LoggerDep) -> IUserRepository:
 def get_file_service(
     logger: LoggerDep,
     settings: SettingsDep,
-    profile_repository: Annotated[IProfileRepository, Depends(get_profile_repository)],
+    profile_repository: ProfileRepositoryDep,
 ) -> IFileService:
     return SupabaseFileService(logger, settings, profile_repository)
 
@@ -124,11 +138,9 @@ def get_data_transformer(
 
 
 def get_profile_service(
-    profile_repository: Annotated[IProfileRepository, Depends(get_profile_repository)],
-    profile_cache_repository: Annotated[
-        IProfileCacheRepository, Depends(get_profile_cache_repository)
-    ],
-    user_repository: Annotated[IUserRepository, Depends(get_user_repository)],
+    profile_repository: ProfileRepositoryDep,
+    profile_cache_repository: ProfileCacheRepositoryDep,
+    user_repository: UserRepositoryDep,
     remote_data_source: Annotated[IRemoteDataSource, Depends(get_linkedin_api)],
     file_service: Annotated[IFileService, Depends(get_file_service)],
     data_transformer: Annotated[IDataTransformer, Depends(get_data_transformer)],
@@ -148,6 +160,18 @@ def get_profile_service(
 
 
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+
+# User Service
+def get_user_service(
+    user_repository: UserRepositoryDep,
+    profile_service: ProfileServiceDep,
+    logger: LoggerDep,
+) -> UserService:
+    return UserService(user_repository, profile_service, logger)
+
+
+UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 
 # Auth
