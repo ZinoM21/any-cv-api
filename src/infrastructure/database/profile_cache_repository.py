@@ -10,7 +10,6 @@ from src.core.domain.models import (
     GuestProfile,
     Position,
     Project,
-    PublishingOptions,
     VolunteeringExperience,
 )
 from src.infrastructure.exceptions import handle_exceptions
@@ -49,7 +48,7 @@ class ProfileCacheRepository(IProfileCacheRepository):
                 for exp in experiences_data:
                     positions_data = exp.pop("positions", [])
                     experience = Experience(**exp)
-                    experience.positions = [Position(**pos) for pos in positions_data]
+                    experience.positions = [Position(**pos) for pos in positions_data]  # type: ignore
                     experiences.append(experience)
                 guest_profile.experiences = experiences
 
@@ -64,11 +63,6 @@ class ProfileCacheRepository(IProfileCacheRepository):
             projects_data = new_data.pop("projects")
             if projects_data is not None:
                 guest_profile.projects = [Project(**proj) for proj in projects_data]
-
-        if "publishingOptions" in new_data:
-            publishing_data = new_data.pop("publishingOptions")
-            if publishing_data is not None:
-                guest_profile.publishingOptions = PublishingOptions(**publishing_data)
 
         for key, value in new_data.items():
             setattr(guest_profile, key, value)
