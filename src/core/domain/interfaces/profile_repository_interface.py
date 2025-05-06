@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from src.core.domain.models import GuestProfile, Profile
+from ..models import GuestProfile, Profile
 
 
 class IProfileRepository(ABC):

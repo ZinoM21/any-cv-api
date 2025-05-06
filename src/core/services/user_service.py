@@ -1,19 +1,29 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import status
 
-from src.core.domain.dtos import UserResponse, UserUpdate
-from src.core.domain.interfaces import ILogger, IUserRepository
-from src.core.services.profile_service import ProfileService
-from src.infrastructure.exceptions import ApiErrorType, handle_exceptions
+from src.core.domain.interfaces import (
+    IUserRepository,
+)
+from src.core.dtos import UserResponse, UserUpdate
+from src.core.exceptions import (
+    HTTPException,
+    HTTPExceptionType,
+    handle_exceptions,
+)
+from src.core.interfaces import (
+    ILogger,
+    IProfileService,
+    IUserService,
+)
 
 
-class UserService:
+class UserService(IUserService):
     def __init__(
         self,
         user_repository: IUserRepository,
-        profile_service: ProfileService,
+        profile_service: IProfileService,
         logger: ILogger,
     ):
         self.user_repository = user_repository
@@ -38,7 +48,7 @@ class UserService:
             self.logger.error(f"User not found: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         return UserResponse(
@@ -68,7 +78,7 @@ class UserService:
             self.logger.error(f"User not found for update: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         # Create a dict with only the non-None fields
@@ -81,7 +91,7 @@ class UserService:
             self.logger.info("No data provided for user update")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ApiErrorType.BadRequest.value,
+                detail=HTTPExceptionType.BadRequest.value,
             )
 
         # Add updated_at to the update data
@@ -93,7 +103,7 @@ class UserService:
             self.logger.error(f"Failed to update user: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
 
         self.logger.info(f"User account updated successfully: {user.email}")
@@ -120,7 +130,7 @@ class UserService:
             # self.logger.error(f"User not found for deletion: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         # Delete all profiles associated with the user, including files
@@ -132,7 +142,7 @@ class UserService:
             # self.logger.error(f"Failed to delete user: {user_id}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
 
         self.logger.debug(f"User account deleted successfully: {user.email}")

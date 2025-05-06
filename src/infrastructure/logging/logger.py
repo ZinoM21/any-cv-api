@@ -1,6 +1,6 @@
 import logging
 
-from src.core.domain.interfaces import ILogger
+from src.core.interfaces import ILogger
 
 
 class UvicornLogger(ILogger):

@@ -1,18 +1,12 @@
 import re
 from typing import Optional
 
-from fastapi import HTTPException, status
-from fastapi.exceptions import RequestValidationError
+from fastapi import status
 
 from src.config import Settings
-from src.core.domain.dtos import PublishingOptionsUpdate, UpdateProfile
 from src.core.domain.interfaces import (
-    IDataTransformer,
-    IFileService,
-    ILogger,
     IProfileCacheRepository,
     IProfileRepository,
-    IRemoteDataSource,
     IUserRepository,
 )
 from src.core.domain.models import (
@@ -20,13 +14,23 @@ from src.core.domain.models import (
     Profile,
     User,
 )
-from src.infrastructure.exceptions import (
-    ApiErrorType,
+from src.core.dtos import PublishingOptionsUpdate, UpdateProfile
+from src.core.exceptions import (
+    HTTPException,
+    HTTPExceptionType,
+    RequestValidationException,
     handle_exceptions,
+)
+from src.core.interfaces import (
+    IDataTransformerService,
+    IFileService,
+    ILogger,
+    IProfileService,
+    IRemoteDataSource,
 )
 
 
-class ProfileService:
+class ProfileService(IProfileService):
     def __init__(
         self,
         profile_repository: IProfileRepository,
@@ -34,7 +38,7 @@ class ProfileService:
         user_repository: IUserRepository,
         remote_data_source: IRemoteDataSource,
         file_service: IFileService,
-        data_transformer: IDataTransformer,
+        data_transformer: IDataTransformerService,
         logger: ILogger,
         settings: Settings,
     ):
@@ -57,12 +61,17 @@ class ProfileService:
                 username,
             )
             if not match:
-                raise RequestValidationError("Invalid LinkedIn URL format")
+                raise RequestValidationException(
+                    message="Invalid LinkedIn URL format",
+                    parameter="username",
+                )
             return match.group(1)
 
         if not re.match(r"^[\w\-]+$", username):
-            raise RequestValidationError("Invalid username format")
-
+            raise RequestValidationException(
+                message="Invalid username format",
+                parameter="username",
+            )
         return username
 
     @handle_exceptions()
@@ -79,7 +88,7 @@ class ProfileService:
         if not raw_profile_data:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=ApiErrorType.ServiceUnavailable.value,
+                detail=HTTPExceptionType.ServiceUnavailable.value,
             )
         self.logger.debug(
             f"Profile data fetched from remote Data Source for: {username}"
@@ -92,7 +101,7 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
         self.logger.debug(f"Profile data transformed for: {username}")
 
@@ -220,7 +229,7 @@ class ProfileService:
             self.logger.debug(f"Profile already exists for user: {username}.")
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=ApiErrorType.ResourceAlreadyExists.value,
+                detail=HTTPExceptionType.ResourceAlreadyExists.value,
             )
 
         # Otherwise, fetch from LinkedIn & transform
@@ -291,12 +300,12 @@ class ProfileService:
             if not profile:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=ApiErrorType.ResourceNotFound.value,
+                    detail=HTTPExceptionType.ResourceNotFound.value,
                 )
             if not self._user_has_access_to_profile(user, profile):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=ApiErrorType.Forbidden.value,
+                    detail=HTTPExceptionType.Forbidden.value,
                 )
 
         else:
@@ -304,7 +313,7 @@ class ProfileService:
             if not profile:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=ApiErrorType.ResourceNotFound.value,
+                    detail=HTTPExceptionType.ResourceNotFound.value,
                 )
 
         return profile.to_mongo().to_dict()
@@ -322,7 +331,7 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
         return profile.to_mongo().to_dict()
 
@@ -345,12 +354,12 @@ class ProfileService:
             if not profile:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=ApiErrorType.ResourceNotFound.value,
+                    detail=HTTPExceptionType.ResourceNotFound.value,
                 )
             if not self._user_has_access_to_profile(user, profile):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=ApiErrorType.Forbidden.value,
+                    detail=HTTPExceptionType.Forbidden.value,
                 )
 
             updated_profile = self.profile_repository.update(profile, data_to_update)
@@ -361,7 +370,7 @@ class ProfileService:
             if not guest_profile:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=ApiErrorType.ResourceNotFound.value,
+                    detail=HTTPExceptionType.ResourceNotFound.value,
                 )
 
             updated_profile = self.profile_cache_repository.update(
@@ -380,12 +389,12 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
         if not self._user_has_access_to_profile(user, profile):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=ApiErrorType.Forbidden.value,
+                detail=HTTPExceptionType.Forbidden.value,
             )
 
         # Delete from db first to cache errors before deleting files
@@ -434,12 +443,12 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
         if not self._user_has_access_to_profile(user, profile):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=ApiErrorType.Forbidden.value,
+                detail=HTTPExceptionType.Forbidden.value,
             )
 
         try:
@@ -451,7 +460,7 @@ class ProfileService:
             if "duplicate key error" in str(exc):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=ApiErrorType.ResourceAlreadyExists.value,
+                    detail=HTTPExceptionType.ResourceAlreadyExists.value,
                 )
             else:
                 raise exc
@@ -465,12 +474,12 @@ class ProfileService:
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
         if not self._user_has_access_to_profile(user, profile):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=ApiErrorType.Forbidden.value,
+                detail=HTTPExceptionType.Forbidden.value,
             )
 
         await self.file_service.delete_public_files_from_folder(
@@ -579,7 +588,7 @@ class ProfileService:
         if not guest_profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         self.logger.debug(f"Found guest profile for username: {username}")

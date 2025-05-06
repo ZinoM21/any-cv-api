@@ -54,15 +54,6 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRES_IN_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRES_IN_MINUTES: int = 60 * 24 * 14  # 2 weeks
     AUTH_ALGORITHM: str = "HS256"
-    PUBLIC_PATHS: list[str] = [
-        "/healthz",
-        "/docs",
-        "/api/openapi.json",
-        "/api/v1/healthz",
-        "/api/v1/profile/",
-        "/api/v1/auth/",
-        "/api/v1/files/public/",
-    ]  # We define them here as "public", but protected data is always secured through user authentication
 
     model_config = SettingsConfigDict(env_file=".env")
 

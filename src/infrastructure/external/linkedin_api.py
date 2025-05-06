@@ -3,11 +3,10 @@ from typing import Dict
 
 import requests
 from fastapi import status
-from fastapi.exceptions import HTTPException
 
 from src.config import Settings
-from src.core.domain.interfaces import ILogger, IRemoteDataSource
-from src.infrastructure.exceptions import ApiErrorType, handle_exceptions
+from src.core.exceptions import HTTPException, HTTPExceptionType, handle_exceptions
+from src.core.interfaces import ILogger, IRemoteDataSource
 
 
 class LinkedInAPI(IRemoteDataSource):
@@ -45,14 +44,14 @@ class LinkedInAPI(IRemoteDataSource):
                 if response.status_code == 404:
                     raise HTTPException(
                         status_code=status.HTTP_404_NOT_FOUND,
-                        detail=ApiErrorType.ResourceNotFound.value,
+                        detail=HTTPExceptionType.ResourceNotFound.value,
                     )
 
                 if response.status_code != 200:
                     if "busy" in str(response.text).lower():
                         raise HTTPException(
                             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail=ApiErrorType.ServiceUnavailable.value,
+                            detail=HTTPExceptionType.ServiceUnavailable.value,
                         )
 
                     raise Exception(

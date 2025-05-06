@@ -1,12 +1,16 @@
 from typing import Dict, List, Optional, Union
 
 import resend
-from fastapi import HTTPException, status
+from fastapi import status
 
 from src.config import Settings
-from src.core.domain.dtos import Attachment, Email, Tag
-from src.core.domain.interfaces import IEmailService, ILogger
-from src.infrastructure.exceptions import ApiErrorType, handle_exceptions
+from src.core.dtos import Attachment, Email, Tag
+from src.core.exceptions import (
+    HTTPException,
+    HTTPExceptionType,
+    handle_exceptions,
+)
+from src.core.interfaces import IEmailService, ILogger
 
 
 class ResendEmailService(IEmailService):
@@ -91,7 +95,7 @@ class ResendEmailService(IEmailService):
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
 
     @handle_exceptions(origin="ResendEmailService.send_verification_email")

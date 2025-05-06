@@ -4,15 +4,16 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-import jwt
 import requests
-from fastapi import HTTPException, status
-from fastapi.exceptions import RequestValidationError
-from jwt import ExpiredSignatureError, InvalidTokenError
+from fastapi import status
 from passlib.context import CryptContext
 
 from src.config import Settings
-from src.core.domain.dtos import (
+from src.core.domain.interfaces import (
+    IUserRepository,
+)
+from src.core.domain.models import User
+from src.core.dtos import (
     AccessResponse,
     ForgotPasswordRequest,
     ForgotPasswordResponse,
@@ -22,18 +23,15 @@ from src.core.domain.dtos import (
     UserLogin,
     UserResponse,
 )
-from src.core.domain.interfaces import (
-    IAuthService,
-    IEmailService,
-    ILogger,
-    IUserRepository,
-)
-from src.core.domain.models import User
-from src.infrastructure.exceptions import (
-    ApiErrorType,
+from src.core.exceptions import (
+    HTTPException,
+    HTTPExceptionType,
+    RequestValidationException,
     UnauthorizedHTTPException,
     handle_exceptions,
 )
+from src.core.interfaces import IAuthService, IEmailService, ILogger
+from src.core.utils import decode_jwt, encode_with_expiry
 
 
 class AuthService(IAuthService):
@@ -57,27 +55,7 @@ class AuthService(IAuthService):
     def _get_password_hash(self, password: str) -> str:
         return self.crypto_context.hash(password)
 
-    def _encode_with_expiry(self, data: dict, expires_in_minutes: int) -> str:
-        data.update(
-            {
-                "exp": datetime.now(timezone.utc)
-                + timedelta(minutes=expires_in_minutes),
-                "iat": datetime.now(timezone.utc),
-            }
-        )
-
-        return jwt.encode(
-            data, self.settings.AUTH_SECRET, algorithm=self.settings.AUTH_ALGORITHM
-        )
-
-    def _decode_token(self, token: str) -> dict:
-        return jwt.decode(
-            token,
-            self.settings.AUTH_SECRET,
-            algorithms=[self.settings.AUTH_ALGORITHM],
-        )
-
-    def _create_tokens(self, user: User, type: Optional[str] = None) -> dict:
+    def _create_tokens(self, user: User, type: Optional[str] = None) -> dict[str, str]:
         if user.firstName or user.lastName:
             data_to_encode = {
                 "sub": str(user.id),
@@ -92,17 +70,26 @@ class AuthService(IAuthService):
 
         if type == "refresh":
             return {
-                "access": self._encode_with_expiry(
-                    data_to_encode, self.settings.ACCESS_TOKEN_EXPIRES_IN_MINUTES
+                "access": encode_with_expiry(
+                    data_to_encode,
+                    self.settings.ACCESS_TOKEN_EXPIRES_IN_MINUTES,
+                    self.settings.AUTH_SECRET,
+                    self.settings.AUTH_ALGORITHM,
                 ),
             }
 
         return {
-            "access": self._encode_with_expiry(
-                data_to_encode, self.settings.ACCESS_TOKEN_EXPIRES_IN_MINUTES
+            "access": encode_with_expiry(
+                data_to_encode,
+                self.settings.ACCESS_TOKEN_EXPIRES_IN_MINUTES,
+                self.settings.AUTH_SECRET,
+                self.settings.AUTH_ALGORITHM,
             ),
-            "refresh": self._encode_with_expiry(
-                data_to_encode, self.settings.REFRESH_TOKEN_EXPIRES_IN_MINUTES
+            "refresh": encode_with_expiry(
+                data_to_encode,
+                self.settings.REFRESH_TOKEN_EXPIRES_IN_MINUTES,
+                self.settings.AUTH_SECRET,
+                self.settings.AUTH_ALGORITHM,
             ),
         }
 
@@ -121,7 +108,7 @@ class AuthService(IAuthService):
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         user = self.user_repository.update(
@@ -137,12 +124,12 @@ class AuthService(IAuthService):
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.InvalidCredentials.value,
+                detail=HTTPExceptionType.InvalidCredentials.value,
             )
 
         if not self._verify_password(request_data.password, str(user.pw_hash)):
             raise UnauthorizedHTTPException(
-                detail=ApiErrorType.InvalidCredentials.value,
+                detail=HTTPExceptionType.InvalidCredentials.value,
             )
 
         tokens = self._create_tokens(user)
@@ -154,7 +141,7 @@ class AuthService(IAuthService):
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=ApiErrorType.ResourceAlreadyExists.value,
+                detail=HTTPExceptionType.ResourceAlreadyExists.value,
             )
 
         hashed_password = self._get_password_hash(user_data.password)
@@ -185,28 +172,27 @@ class AuthService(IAuthService):
 
     @handle_exceptions(origin="AuthService.refresh_token")
     async def refresh_token(self, refresh_token: str) -> AccessResponse:
-        try:
-            payload = self._decode_token(refresh_token)
-        except ExpiredSignatureError:
-            raise UnauthorizedHTTPException(detail=ApiErrorType.TokenExpired.value)
-        except InvalidTokenError:
-            raise UnauthorizedHTTPException(detail=ApiErrorType.InvalidToken.value)
+        payload = decode_jwt(
+            refresh_token, self.settings.AUTH_SECRET, self.settings.AUTH_ALGORITHM
+        )
 
         email = payload.get("email")
         if email is None:
             raise UnauthorizedHTTPException(
-                detail=ApiErrorType.InvalidToken.value,
+                detail=HTTPExceptionType.InvalidToken.value,
             )
 
         user = self.user_repository.find_by_email(email)
         if user is None:
-            raise UnauthorizedHTTPException(detail=ApiErrorType.InvalidToken.value)
+            raise UnauthorizedHTTPException(detail=HTTPExceptionType.InvalidToken.value)
 
         new_access_token = self._create_tokens(user, "refresh")
         return AccessResponse(**new_access_token)
 
     @handle_exceptions(origin="AuthService.verify_turnstile")
-    async def verify_turnstile(self, token: str, remote_ip: str | None = None) -> bool:
+    async def verify_turnstile(
+        self, token: str | None, remote_ip: str | None = None
+    ) -> bool:
         """
         Verify a Turnstile token againt an external service
 
@@ -223,7 +209,7 @@ class AuthService(IAuthService):
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ApiErrorType.BadRequest.value,
+                detail=HTTPExceptionType.BadRequest.value,
             )
 
         data = {
@@ -234,57 +220,38 @@ class AuthService(IAuthService):
         if remote_ip:
             data["remoteip"] = remote_ip
 
-        try:
-            response = requests.post(self.settings.TURNSTILE_CHALLENGE_URL, json=data)
+        response = requests.post(self.settings.TURNSTILE_CHALLENGE_URL, json=data)
 
-            verify_response = response.json()
-            if not verify_response.get("success"):
-                error_codes = verify_response.get("error-codes") or []
-                self.logger.error(f"Turnstile verification failed: {error_codes}")
-                if (
-                    "invalid-input-response" in error_codes
-                    or "missing-input-response" in error_codes
-                ):
-                    raise RequestValidationError(
-                        errors=[
-                            {
-                                "loc": ["body", "turnstileToken"],
-                                "msg": "Turnstile token is invalid",
-                            }
-                        ]
-                    )
-                elif "bad-request" in error_codes:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=ApiErrorType.BadRequest.value,
-                    )
-                elif "timeout-or-duplicate" in error_codes:
-                    raise RequestValidationError(
-                        errors=[
-                            {
-                                "loc": ["body", "turnstileToken"],
-                                "msg": "Turnstile token already used",
-                            }
-                        ]
-                    )
-                elif "internal-error" in error_codes:
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail=ApiErrorType.ServiceUnavailable.value,
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=ApiErrorType.InternalServerError.value,
-                    )
+        verify_response = response.json()
+        if not verify_response.get("success"):
+            error_codes = verify_response.get("error-codes") or []
+            self.logger.error(f"Turnstile verification failed: {error_codes}")
+            if "missing-input-response" in error_codes or "bad-request" in error_codes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=HTTPExceptionType.BadRequest.value,
+                )
+            elif (
+                "invalid-input-response" in error_codes
+                or "timeout-or-duplicate" in error_codes
+            ):
+                raise RequestValidationException(
+                    message="Turnstile token is invalid",
+                    parameter="turnstileToken",
+                )
+            elif "internal-error" in error_codes:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=HTTPExceptionType.ServiceUnavailable.value,
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=HTTPExceptionType.InternalServerError.value,
+                )
 
-            self.logger.debug("Request validated against Turnstile")
-            return True
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500, detail=f"Failed to verify Turnstile token: {str(e)}"
-            )
+        self.logger.debug("Request validated against Turnstile")
+        return True
 
     @handle_exceptions(origin="AuthService.verify_email")
     async def verify_email(self, token: str) -> bool:
@@ -293,7 +260,7 @@ class AuthService(IAuthService):
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ApiErrorType.BadRequest.value,
+                detail=HTTPExceptionType.BadRequest.value,
             )
 
         updated_user = self.user_repository.update(
@@ -307,7 +274,7 @@ class AuthService(IAuthService):
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
 
         return True
@@ -340,7 +307,7 @@ class AuthService(IAuthService):
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
 
         return token
@@ -402,7 +369,7 @@ class AuthService(IAuthService):
             self.logger.error("No new password provided")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ApiErrorType.BadRequest.value,
+                detail=HTTPExceptionType.BadRequest.value,
             )
 
         # This endpoint can only be used by an authed user or from a password reset email
@@ -413,20 +380,20 @@ class AuthService(IAuthService):
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ApiErrorType.BadRequest.value,
+                detail=HTTPExceptionType.BadRequest.value,
             )
 
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         # Exception if new is same as old
         if self._verify_password(new_password, str(user.pw_hash)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=ApiErrorType.BadRequest.value,
+                detail=HTTPExceptionType.BadRequest.value,
             )
 
         new_hashed_password = self._get_password_hash(new_password)
@@ -442,7 +409,7 @@ class AuthService(IAuthService):
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=ApiErrorType.InternalServerError.value,
+                detail=HTTPExceptionType.InternalServerError.value,
             )
 
         self.logger.info(f"Password reset successfully for user: {user.email}")

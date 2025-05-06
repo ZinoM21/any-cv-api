@@ -1,20 +1,22 @@
 import mimetypes
 import os
-from typing import List, Optional
+from typing import Optional
 from urllib.parse import unquote, urlparse
 
 import aiohttp
-from fastapi import HTTPException, status
-from fastapi.exceptions import RequestValidationError
-from supabase import Client, ClientOptions, create_client
+from fastapi import status
 
 from src.config import Settings
-from src.core.domain.dtos import File, SignedUrl
-from src.core.domain.interfaces import IFileService, ILogger, IProfileRepository
-from src.infrastructure.exceptions import (
-    ApiErrorType,
+from src.core.domain.interfaces import IProfileRepository
+from src.core.dtos import File, SignedUrl
+from src.core.exceptions import (
+    HTTPException,
+    HTTPExceptionType,
+    RequestValidationException,
     handle_exceptions,
 )
+from src.core.interfaces import IFileService, ILogger
+from supabase import Client, ClientOptions, create_client
 
 
 class SupabaseFileService(IFileService):
@@ -197,19 +199,15 @@ class SupabaseFileService(IFileService):
             Dict containing the signed URL and other metadata
         """
         if not file_path:
-            raise RequestValidationError(
-                errors=[
-                    {
-                        "loc": ["body", "file_path"],
-                        "msg": "file_path cannot be empty",
-                    }
-                ]
+            raise RequestValidationException(
+                message="File path cannot be empty",
+                parameter="file_path",
             )
 
         if not self._verify_path_access(file_path, user_id):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=ApiErrorType.Forbidden.value,
+                detail=HTTPExceptionType.Forbidden.value,
             )
 
         try:
@@ -226,8 +224,8 @@ class SupabaseFileService(IFileService):
 
     @handle_exceptions()
     async def generate_signed_urls(
-        self, file_paths: List[str], user_id: str
-    ) -> List[SignedUrl]:
+        self, file_paths: list[str], user_id: str
+    ) -> list[SignedUrl]:
         """
         Generate multiple signed URLs for files
 
@@ -238,21 +236,11 @@ class SupabaseFileService(IFileService):
         Returns:
             List of SignedUrl objects containing the signed URLs
         """
-        if not file_paths:
-            raise RequestValidationError(
-                errors=[
-                    {
-                        "loc": ["body", "file_paths"],
-                        "msg": "file_paths cannot be empty",
-                    }
-                ]
-            )
-
         for file_path in file_paths:
             if not self._verify_path_access(file_path, user_id):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=ApiErrorType.Forbidden.value,
+                    detail=HTTPExceptionType.Forbidden.value,
                 )
 
         responses = self.supabase_service.storage.from_(
@@ -303,7 +291,7 @@ class SupabaseFileService(IFileService):
             if not self._verify_path_access(filename, user_id):
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=ApiErrorType.Forbidden.value,
+                    detail=HTTPExceptionType.Forbidden.value,
                 )
 
             response = self.supabase_service.storage.from_(
@@ -331,7 +319,7 @@ class SupabaseFileService(IFileService):
         if not profile:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=ApiErrorType.ResourceNotFound.value,
+                detail=HTTPExceptionType.ResourceNotFound.value,
             )
 
         response = self.supabase_service.storage.from_(

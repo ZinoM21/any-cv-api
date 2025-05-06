@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import EmailStr
 
-from src.core.domain.models import Profile, User
+from ..models import Profile, User
 
 
 class IUserRepository(ABC):

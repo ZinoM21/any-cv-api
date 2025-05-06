@@ -10,4 +10,14 @@ from .profile import (
 )
 from .user import User
 
-__all__ = ["Profile", "User", "GuestProfile"]
+__all__ = [
+    "Profile",
+    "User",
+    "GuestProfile",
+    "Education",
+    "Experience",
+    "Position",
+    "Project",
+    "PublishingOptions",
+    "VolunteeringExperience",
+]

@@ -6,7 +6,7 @@ anyio==4.9.0
 astroid==3.3.9
 async-timeout==5.0.1
 attrs==25.3.0
-bcrypt==4.3.0
+bcrypt==4.0.1
 certifi==2025.4.26
 cffi==1.17.1
 charset-normalizer==3.4.2
@@ -52,7 +52,6 @@ pytest==8.3.5
 pytest-mock==3.14.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
-python-jose==3.4.0
 realtime==2.4.3
 requests==2.32.3
 resend==2.8.0
