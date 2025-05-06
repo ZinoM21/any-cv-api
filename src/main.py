@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from slowapi.middleware import SlowAPIMiddleware
 
 from src.config import settings
@@ -21,7 +20,7 @@ from src.presentation.exceptions import add_exception_handlers
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, logger=logger, db=Database):
+async def lifespan(_: FastAPI, logger=logger, db=Database):
     """Context manager to handle application lifespan events"""
     logger.info("FastAPI application started")
     try:
@@ -74,4 +73,4 @@ app.include_router(user_controller_v1)
 
 @app.get("/healthz")
 async def healthz():
-    return JSONResponse(content={"status": "ok"})
+    return {"status": "ok"}
