@@ -1,14 +1,13 @@
 import json
 from unittest.mock import AsyncMock, MagicMock
 
-import mongomock
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 from mongoengine import connect, disconnect
 from pydantic_settings import SettingsConfigDict
 from src.config import Settings
-from src.core.domain.models import User
+from src.core.domain.models import GuestProfile, Profile, User
 from src.core.interfaces import ILogger, IProfileDataProvider
 from src.deps import get_settings
 from src.infrastructure.persistence.configuration.database import Database
@@ -31,10 +30,10 @@ class MockDatabase(Database):
     def connect(cls, mongodb_url: str, logger: ILogger):
         try:
             connect(
-                "anycv",
+                "testdb",
                 host=mongodb_url,
                 uuidRepresentation="standard",
-                mongo_client_class=mongomock.MongoClient,
+                # mongo_client_class=mongomock.MongoClient,
                 alias="default",
             )
         except Exception:
@@ -86,6 +85,28 @@ def mock_user():
 
 
 @pytest.fixture
+def mock_profile():
+    return Profile(
+        username="johndoe",
+        firstName="John",
+        lastName="Doe",
+        headline="Software Developer",
+        about="Experienced software developer with a passion for building scalable applications",
+    )
+
+
+@pytest.fixture
+def mock_guest_profile():
+    return GuestProfile(
+        username="johndoe",
+        firstName="John",
+        lastName="Doe",
+        headline="Software Developer",
+        about="Experienced software developer with a passion for building scalable applications",
+    )
+
+
+@pytest.fixture
 def remote_data():
     with open("tests/mock_remote_data_return.json", "r") as f:
         return json.load(f)
@@ -105,28 +126,4 @@ def always_passes_cf_secret():
 
 @pytest.fixture
 def always_blocks_cf_secret():
-    return "2x0000000000000000000000000000000AA	"
-
-
-# @pytest.fixture
-# def mock_profile_service(mock_remote_data_source):
-#     app.dependency_overrides[get_linkedin_api] = lambda: mock_remote_data_source
-
-#     mock = MagicMock(spec=IProfileService)
-#     # mock.get_profile = AsyncMock(return_value=mock_profile)
-
-#     return mock
-
-
-# @pytest.fixture
-# def mock_turnstile_verifier_success():
-#     mock = MagicMock(spec=ITurnstileVerifier)
-#     mock.verify_turnstile = AsyncMock(return_value=True)
-#     return mock
-
-
-# @pytest.fixture
-# def mock_turnstile_verifier_failure():
-#     mock = MagicMock(spec=ITurnstileVerifier)
-#     mock.verify_turnstile = AsyncMock(return_value=False)
-#     return mock
+    return "2x0000000000000000000000000000000AA"
