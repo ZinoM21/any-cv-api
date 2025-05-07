@@ -107,7 +107,7 @@ Optional:
    RESEND_FROM_EMAIL=<your-from-email>         # Email address used as sender
 
    # Auth
-   AUTH_SECRET=<your-auth-secret>              # Secret key for JWT token generation/validation
+   AUTH_SECRET=<your-auth-secret>              # Secret key for JWT token generation/validation. Note: shared with frontend!
    ```
 
 5. Run the application
@@ -117,6 +117,8 @@ Optional:
    ```
 
 6. Access the API documentation at `http://localhost:8000/docs`
+
+7. Run an instance of the [AnyCV frontend](https://github.com/ZinoM21/any-cv-app)
 
 ## Development
 
