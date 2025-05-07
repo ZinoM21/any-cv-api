@@ -88,4 +88,4 @@ class UpdateProfile(BaseModel):
 
 
 class CreateProfile(BaseModel):
-    turnstileToken: Optional[Str255] = None
+    turnstileToken: Optional[str] = None
