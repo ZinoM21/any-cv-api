@@ -89,3 +89,9 @@ class UpdateProfile(BaseModel):
 
 class CreateProfile(BaseModel):
     turnstileToken: Optional[str] = None
+
+
+class PublishProfileOptions(BaseModel):
+    appearance: Str255
+    templateId: Str255
+    slug: Str30

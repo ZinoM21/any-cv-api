@@ -1,8 +1,6 @@
 from fastapi import FastAPI, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.exception_handlers import (
-    http_exception_handler,
-)
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import (
     HTTPException as FastAPIHTTPException,
 )
@@ -23,7 +21,7 @@ from src.core.exceptions import (
 from src.core.interfaces import ILogger
 
 
-def get_error_message(message: str, parameter: str | None = None) -> str:
+def get_invalid_input_error_message(message: str, parameter: str | None = None) -> str:
     return f"Invalid input{' parameter: ' + parameter if parameter else ''}. {message}"
 
 
@@ -33,7 +31,9 @@ def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
     async def custom_http_exception_handler(
         request: Request, exc: HTTPException, logger=logger
     ):
-        logger.error(f"HTTPException{f' in {exc.origin}' if exc.origin else ''}: {exc}")
+        logger.error(
+            f"HTTPException{f' in {exc.origin}' if exc.origin else ''}: {exc.status_code} - {exc.detail}"
+        )
         return await http_exception_handler(
             request,
             FastAPIHTTPException(
@@ -73,7 +73,7 @@ def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
             content=jsonable_encoder(
                 {
                     "detail": [
-                        get_error_message(error["msg"], error["loc"][-1])
+                        get_invalid_input_error_message(error["msg"], error["loc"][-1])
                         for error in exc.errors()
                     ],
                     **(
@@ -94,7 +94,9 @@ def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content=jsonable_encoder(
                 {
-                    "detail": get_error_message(exc.message, exc.parameter),
+                    "detail": get_invalid_input_error_message(
+                        exc.message, exc.parameter
+                    ),
                     **(
                         {"body": request.body}
                         if hasattr(request, "body") and request.body

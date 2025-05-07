@@ -5,6 +5,7 @@ from src.core.exceptions import (
     HTTPException,
     HTTPExceptionType,
     RequestValidationException,
+    handle_exceptions,
 )
 from src.core.interfaces import ILogger, ITurnstileVerifier
 
@@ -23,6 +24,7 @@ class CloudflareTurnstileVerifier(BaseApiAdapter, ITurnstileVerifier):
         )
         self.secret_key = secret or settings.TURNSTILE_SECRET_KEY
 
+    @handle_exceptions()
     async def verify_token(
         self, token: str | None, remote_ip: str | None = None
     ) -> bool:
@@ -40,9 +42,9 @@ class CloudflareTurnstileVerifier(BaseApiAdapter, ITurnstileVerifier):
             HTTPException: If verification fails
         """
         if not token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=HTTPExceptionType.BadRequest.value,
+            raise RequestValidationException(
+                message="Turnstile token is required",
+                parameter="turnstileToken",
             )
 
         data = {
@@ -53,56 +55,41 @@ class CloudflareTurnstileVerifier(BaseApiAdapter, ITurnstileVerifier):
         if remote_ip:
             data["remoteip"] = remote_ip
 
-        try:
-            response = await self.post(json_data=data)
+        response = await self.post(json_data=data)
 
-            if not response:
+        if not response:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=HTTPExceptionType.ServiceUnavailable.value,
+            )
+
+        if not response.get("success"):
+            error_codes = response.get("error-codes") or []
+            self.logger.error(f"Turnstile verification failed: {error_codes}")
+
+            if "missing-input-response" in error_codes or "bad-request" in error_codes:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=HTTPExceptionType.BadRequest.value,
+                )
+            elif (
+                "invalid-input-response" in error_codes
+                or "timeout-or-duplicate" in error_codes
+            ):
+                raise RequestValidationException(
+                    message="Turnstile token is invalid",
+                    parameter="turnstileToken",
+                )
+            elif "internal-error" in error_codes:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=HTTPExceptionType.ServiceUnavailable.value,
+                )
+            else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=HTTPExceptionType.InternalServerError.value,
                 )
 
-            if not response.get("success"):
-                error_codes = response.get("error-codes") or []
-                self.logger.error(f"Turnstile verification failed: {error_codes}")
-
-                if (
-                    "missing-input-response" in error_codes
-                    or "bad-request" in error_codes
-                ):
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=HTTPExceptionType.BadRequest.value,
-                    )
-                elif (
-                    "invalid-input-response" in error_codes
-                    or "timeout-or-duplicate" in error_codes
-                ):
-                    raise RequestValidationException(
-                        message="Turnstile token is invalid",
-                        parameter="turnstileToken",
-                    )
-                elif "internal-error" in error_codes:
-                    raise HTTPException(
-                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail=HTTPExceptionType.ServiceUnavailable.value,
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=HTTPExceptionType.InternalServerError.value,
-                    )
-
-            self.logger.debug("Request validated against Turnstile")
-            return True
-
-        except HTTPException:
-            # Re-raise HTTP exceptions
-            raise
-        except Exception as e:
-            # Log and convert other exceptions
-            self.logger.error(f"Error verifying turnstile token: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=HTTPExceptionType.InternalServerError.value,
-            )
+        self.logger.debug("Request validated against Turnstile")
+        return True

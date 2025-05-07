@@ -5,7 +5,12 @@ from .file import (
     SignedUrlRequest,
     SignedUrlsRequest,
 )
-from .profile import CreateProfile, PublishingOptionsUpdate, UpdateProfile
+from .profile import (
+    CreateProfile,
+    PublishingOptionsUpdate,
+    PublishProfileOptions,
+    UpdateProfile,
+)
 from .token import AccessResponse, RefreshRequest, TokensResponse
 from .user import (
     Attachment,
@@ -30,6 +35,7 @@ __all__ = [
     "SignedUrlsRequest",
     "CreateProfile",
     "PublishingOptionsUpdate",
+    "PublishProfileOptions",
     "UpdateProfile",
     "AccessResponse",
     "RefreshRequest",

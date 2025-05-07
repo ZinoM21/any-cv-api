@@ -6,6 +6,7 @@ from typing import (
 
 from .exceptions import (
     HTTPException,
+    RequestValidationException,
     UnauthorizedHTTPException,
     UncaughtException,
 )
@@ -42,6 +43,12 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return await func(*args, **kwargs)
+                except RequestValidationException as exc:
+                    raise RequestValidationException(
+                        message=exc.message,
+                        parameter=exc.parameter,
+                        origin=exc.origin or exception_origin,
+                    )
                 except (HTTPException, UnauthorizedHTTPException) as exc:
                     # Add an origin to HTTPExceptions
                     raise HTTPException(
@@ -65,6 +72,12 @@ def handle_exceptions(origin: Optional[str] = None):
 
                 try:
                     return func(*args, **kwargs)
+                except RequestValidationException as exc:
+                    raise RequestValidationException(
+                        message=exc.message,
+                        parameter=exc.parameter,
+                        origin=exc.origin or exception_origin,
+                    )
                 except (HTTPException, UnauthorizedHTTPException) as exc:
                     # Add an origin to HTTPExceptions
                     raise HTTPException(

@@ -27,9 +27,12 @@ class DataValidationError(DataTransformerError):
 class RequestValidationException(Exception):
     """Raised when request validation fails."""
 
-    def __init__(self, message: str, parameter: str | None = None) -> None:
+    def __init__(
+        self, message: str, parameter: str | None = None, origin: str | None = None
+    ) -> None:
         self.message = message
         self.parameter = parameter
+        self.origin = origin
 
 
 class HTTPException(Exception):

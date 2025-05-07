@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from ..domain.models import User
-from ..dtos import PublishingOptionsUpdate, UpdateProfile
-from ..dtos.profile import CreateProfile
+from ..dtos import CreateProfile, PublishProfileOptions, UpdateProfile
 
 
 class IProfileService(ABC):
@@ -58,7 +57,7 @@ class IProfileService(ABC):
 
     @abstractmethod
     async def publish_profile(
-        self, username: str, data: PublishingOptionsUpdate, user: User
+        self, username: str, data: PublishProfileOptions, user: User
     ) -> dict:
         """Publish a profile"""
         pass

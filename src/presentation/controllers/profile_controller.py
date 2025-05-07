@@ -1,14 +1,10 @@
 from fastapi import APIRouter, Request, status
 
-from src.core.dtos import CreateProfile, PublishingOptionsUpdate, UpdateProfile
+from src.core.dtos import CreateProfile, PublishProfileOptions, UpdateProfile
 from src.core.exceptions import (
     handle_exceptions,
 )
-from src.deps import (
-    CurrentUserDep,
-    OptionalCurrentUserDep,
-    ProfileServiceDep,
-)
+from src.deps import CurrentUserDep, OptionalCurrentUserDep, ProfileServiceDep, limiter
 
 profile_controller_v1 = APIRouter(prefix="/v1/profile", tags=["profile"])
 
@@ -57,7 +53,7 @@ async def get_profile(
 
 
 @profile_controller_v1.post("/{username}")
-# @limiter.limit("3/minute; 10/day")
+@limiter.limit("10/hour")
 @handle_exceptions()
 async def create_profile(
     request: Request,
@@ -114,14 +110,14 @@ async def delete_profile(
 @handle_exceptions()
 async def publish_profile(
     username: str,
-    profile_data: PublishingOptionsUpdate,
+    profile_data: PublishProfileOptions,
     profile_service: ProfileServiceDep,
     user: CurrentUserDep,
 ):
     return await profile_service.publish_profile(username, profile_data, user)
 
 
-@profile_controller_v1.patch("/{username}/unpublish")
+@profile_controller_v1.get("/{username}/unpublish")
 @handle_exceptions()
 async def unpublish_profile(
     username: str,

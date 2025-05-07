@@ -59,8 +59,8 @@ class UserRepository(IUserRepository):
 
     @handle_exceptions()
     def append_profile_to_user(self, profile: Profile, user: User) -> User:
-        User.objects(id=user.id).update_one(push__profiles=profile)  # type: ignore
-        return user.save()
+        user.update(push__profiles=profile)
+        return user.reload()
 
     @handle_exceptions()
     def delete(self, user: User) -> bool:

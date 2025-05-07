@@ -23,8 +23,7 @@ from ..domain.models import (
     Profile,
     User,
 )
-from ..dtos import PublishingOptionsUpdate, UpdateProfile
-from ..dtos.profile import CreateProfile
+from ..dtos import CreateProfile, PublishProfileOptions, UpdateProfile
 from ..exceptions import (
     HTTPException,
     HTTPExceptionType,
@@ -118,14 +117,6 @@ class ProfileService(IProfileService):
             )
 
         return profile
-
-    @handle_exceptions()
-    def _user_has_access_to_profile(self, user: User, profile: Profile) -> bool:
-        if user:
-            for p in user.profiles:  # type: ignore
-                if p.id == profile.id:
-                    return True
-        return False
 
     @handle_exceptions()
     async def _get_profile_from_user_by_username(
@@ -336,11 +327,6 @@ class ProfileService(IProfileService):
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=HTTPExceptionType.ResourceNotFound.value,
                 )
-            if not self._user_has_access_to_profile(user, profile):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=HTTPExceptionType.Forbidden.value,
-                )
 
         else:
             profile = self.profile_cache_repository.find_by_username(username)
@@ -390,11 +376,6 @@ class ProfileService(IProfileService):
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=HTTPExceptionType.ResourceNotFound.value,
                 )
-            if not self._user_has_access_to_profile(user, profile):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=HTTPExceptionType.Forbidden.value,
-                )
 
             updated_profile = self.profile_repository.update(profile, data_to_update)
 
@@ -425,11 +406,6 @@ class ProfileService(IProfileService):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=HTTPExceptionType.ResourceNotFound.value,
             )
-        if not self._user_has_access_to_profile(user, profile):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=HTTPExceptionType.Forbidden.value,
-            )
 
         # Delete from db first to cache errors before deleting files
         self.profile_repository.delete(profile)
@@ -458,7 +434,7 @@ class ProfileService(IProfileService):
 
     @handle_exceptions()
     async def publish_profile(
-        self, username: str, data: PublishingOptionsUpdate, user: User
+        self, username: str, data: PublishProfileOptions, user: User
     ) -> dict:
         """
         Publish a profile
@@ -478,11 +454,6 @@ class ProfileService(IProfileService):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=HTTPExceptionType.ResourceNotFound.value,
-            )
-        if not self._user_has_access_to_profile(user, profile):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=HTTPExceptionType.Forbidden.value,
             )
 
         try:
@@ -509,11 +480,6 @@ class ProfileService(IProfileService):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=HTTPExceptionType.ResourceNotFound.value,
-            )
-        if not self._user_has_access_to_profile(user, profile):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=HTTPExceptionType.Forbidden.value,
             )
 
         await self.file_service.delete_public_files_from_folder(
@@ -630,12 +596,9 @@ class ProfileService(IProfileService):
         # Check if user already has this profile
         existing_profile = await self._get_profile_from_user_by_username(username, user)
         if existing_profile:
-            # If profile already exists, check if user has access
-            if self._user_has_access_to_profile(user, existing_profile):
-                self.logger.debug(f"User already has access to profile: {username}")
-                # User already has this profile, delete the guest profile
-                self.profile_cache_repository.delete(guest_profile)
-                return existing_profile.to_mongo().to_dict()
+            self.logger.debug(f"User already has access to profile: {username}")
+            self.profile_cache_repository.delete(guest_profile)
+            return existing_profile.to_mongo().to_dict()
 
         # Create the new profile from the guest profile
         new_profile = Profile(
