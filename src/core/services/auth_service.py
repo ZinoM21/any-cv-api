@@ -98,7 +98,7 @@ class AuthService(IAuthService):
             ),
         }
 
-    @handle_exceptions(origin="AuthService._generate_and_store_email_verify_token")
+    @handle_exceptions()
     async def _generate_and_store_email_verify_token(self, user_id: str) -> str:
         """Generate a random token for email verification and store it in the database."""
         # 1. Generate a random token
@@ -123,7 +123,7 @@ class AuthService(IAuthService):
 
         return token
 
-    @handle_exceptions(origin="AuthService.authenticate_user")
+    @handle_exceptions()
     async def authenticate_user(self, request_data: UserLogin) -> TokensResponse:
         user = self.user_repository.find_by_email(request_data.email)
         if not user:
@@ -140,7 +140,7 @@ class AuthService(IAuthService):
         tokens = self._create_tokens(user)
         return TokensResponse(**tokens)
 
-    @handle_exceptions(origin="AuthService.register_user")
+    @handle_exceptions()
     async def register_user(self, user_data: UserCreate) -> UserResponse:
         existing_email = self.user_repository.find_by_email(user_data.email)
         if existing_email:
@@ -175,7 +175,7 @@ class AuthService(IAuthService):
             email_verified=bool(new_user.email_verified),
         )
 
-    @handle_exceptions(origin="AuthService.refresh_token")
+    @handle_exceptions()
     async def refresh_token(self, refresh_token: str) -> AccessResponse:
         payload = decode_jwt(
             refresh_token, self.settings.AUTH_SECRET, self.settings.AUTH_ALGORITHM
@@ -194,7 +194,7 @@ class AuthService(IAuthService):
         new_access_token = self._create_tokens(user, "refresh")
         return AccessResponse(**new_access_token)
 
-    @handle_exceptions(origin="AuthService.verify_email")
+    @handle_exceptions()
     async def verify_email(self, token: str) -> bool:
         """Verify a user's email with the provided token."""
         user = self.user_repository.find_by_verification_token(token)
@@ -220,7 +220,7 @@ class AuthService(IAuthService):
 
         return True
 
-    @handle_exceptions(origin="AuthService._generate_and_store_password_reset_token")
+    @handle_exceptions()
     async def _generate_and_store_password_reset_token(self, user: User) -> str:
         """Generate a random token for password reset and store it in the database.
 
@@ -253,7 +253,7 @@ class AuthService(IAuthService):
 
         return token
 
-    @handle_exceptions(origin="AuthService.forgot_password")
+    @handle_exceptions()
     async def forgot_password(
         self, request: ForgotPasswordRequest
     ) -> ForgotPasswordResponse:
@@ -287,7 +287,7 @@ class AuthService(IAuthService):
 
         return ForgotPasswordResponse()
 
-    @handle_exceptions(origin="AuthService.reset_password")
+    @handle_exceptions()
     async def reset_password(
         self,
         user_id: str | None = None,

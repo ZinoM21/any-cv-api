@@ -48,6 +48,8 @@ def handle_exceptions(origin: Optional[str] = None):
                         status_code=exc.status_code,
                         detail=exc.detail,
                         origin=exc.origin or exception_origin,
+                        # Using the origin from the exception first ensures that if nested functions are all wrapped with this decorator,
+                        # the origin will be the closest parent function of the thrown exception, not the outermost function
                     )
                 except (Exception, UncaughtException) as exc:
                     # All other exceptions are considered uncaught

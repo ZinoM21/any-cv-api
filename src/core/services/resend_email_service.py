@@ -31,7 +31,7 @@ class ResendEmailService(IEmailService):
 
         resend.api_key = settings.RESEND_API_KEY
 
-    @handle_exceptions(origin="ResendEmailService._send_email")
+    @handle_exceptions()
     async def _send_email(
         self,
         to_email: Union[str, List[str]],
@@ -98,7 +98,7 @@ class ResendEmailService(IEmailService):
                 detail=HTTPExceptionType.InternalServerError.value,
             )
 
-    @handle_exceptions(origin="ResendEmailService.send_verification_email")
+    @handle_exceptions()
     async def send_verification_email(
         self, email: str, token: str, name: str = ""
     ) -> Email:
@@ -148,7 +148,7 @@ class ResendEmailService(IEmailService):
         self.logger.debug(f"Verification email sent to {email}.")
         return verification_email
 
-    @handle_exceptions(origin="ResendEmailService.send_password_reset_email")
+    @handle_exceptions()
     async def send_password_reset_email(
         self, email: str, token: str, name: str = ""
     ) -> Email:

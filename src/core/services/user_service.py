@@ -30,7 +30,7 @@ class UserService(IUserService):
         self.profile_service = profile_service
         self.logger = logger
 
-    @handle_exceptions(origin="UserService.get_user")
+    @handle_exceptions()
     async def get_user(self, user_id: str) -> UserResponse:
         """Get a user's information.
 
@@ -59,7 +59,7 @@ class UserService(IUserService):
             email_verified=bool(user.email_verified),
         )
 
-    @handle_exceptions(origin="UserService.update_user")
+    @handle_exceptions()
     async def update_user(self, user_id: str, user_data: UserUpdate) -> UserResponse:
         """Updates a user's account information.
 
@@ -115,7 +115,7 @@ class UserService(IUserService):
             email_verified=bool(updated_user.email_verified),
         )
 
-    @handle_exceptions(origin="UserService.delete_user")
+    @handle_exceptions()
     async def delete_user(self, user_id: str) -> None:
         """Delete a user and all associated profiles.
 

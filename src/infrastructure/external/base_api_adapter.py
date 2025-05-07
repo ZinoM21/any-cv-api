@@ -31,8 +31,6 @@ class BaseApiAdapter:
         self.settings = settings
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
-
-        # Set default headers if provided
         if headers:
             self.session.headers.update(headers)
 
@@ -62,7 +60,7 @@ class BaseApiAdapter:
         url = f"{self.base_url}/{endpoint.lstrip('/')}" if endpoint else self.base_url
         request_kwargs = {"json": json_data, "params": params, "headers": headers}
 
-        # Remove None values
+        # remove None values
         request_kwargs = {k: v for k, v in request_kwargs.items() if v is not None}
 
         retries = 0
@@ -72,28 +70,23 @@ class BaseApiAdapter:
             try:
                 response = self.session.request(method, url, **request_kwargs)
 
-                # Handle 404 responses
                 if response.status_code == 404:
                     raise HTTPException(
                         status_code=requests.codes.not_found,
                         detail=HTTPExceptionType.ResourceNotFound.value,
                     )
 
-                # Handle non-200 responses
                 if response.status_code != 200:
-                    # Special handling for "busy" responses if requested
                     if handle_busy_response and "busy" in str(response.text).lower():
                         raise HTTPException(
                             status_code=requests.codes.service_unavailable,
                             detail=HTTPExceptionType.ServiceUnavailable.value,
                         )
 
-                    # General error for other non-200 responses
                     raise Exception(
                         f"Error in {method} request to {url}: {response.status_code} - {response.text}"
                     )
 
-                # Return JSON response
                 return response.json()
 
             except Exception as e:
