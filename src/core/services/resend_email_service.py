@@ -28,8 +28,8 @@ class ResendEmailService(IEmailService):
         self.frontend_url = settings.FRONTEND_URL
         self.email_from = settings.RESEND_FROM_EMAIL
         self.email_to = settings.RESEND_TO_EMAIL
-
-        resend.api_key = settings.RESEND_API_KEY
+        if settings.RESEND_API_KEY:
+            resend.api_key = settings.RESEND_API_KEY
 
     @handle_exceptions()
     async def _send_email(
@@ -45,7 +45,7 @@ class ResendEmailService(IEmailService):
         tags: Optional[List[Tag]] = None,
         headers: Optional[Dict[str, str]] = None,
         scheduled_at: Optional[str] = None,
-    ) -> Email:
+    ) -> Email | None:
         """Send a general email using Resend.
 
         Args:
@@ -66,6 +66,11 @@ class ResendEmailService(IEmailService):
         Raises:
             HTTPException 500: If the email fails to send
         """
+        if not self.settings.RESEND_API_KEY:
+            self.logger.debug(
+                f"Email `{subject}` to `{to_email}` skipped because of missing API key"
+            )
+            return None
 
         params: resend.Emails.SendParams = {
             "from": f"Zino from BuildAnyCV <{self.email_from}>",
@@ -101,7 +106,7 @@ class ResendEmailService(IEmailService):
     @handle_exceptions()
     async def send_verification_email(
         self, email: str, token: str, name: str = ""
-    ) -> Email:
+    ) -> Email | None:
         """Send a verification email to a newly registered user.
 
         Args:
@@ -145,13 +150,15 @@ class ResendEmailService(IEmailService):
             subject="Confirm your BuildAnyCV account",
             html_content=html_content,
         )
-        self.logger.debug(f"Verification email sent to {email}.")
-        return verification_email
+        if verification_email:
+            self.logger.debug(f"Verification email sent to {email}.")
+            return verification_email
+        return None
 
     @handle_exceptions()
     async def send_password_reset_email(
         self, email: str, token: str, name: str = ""
-    ) -> Email:
+    ) -> Email | None:
         """Send a password reset email to a user.
 
         Args:
@@ -246,5 +253,7 @@ class ResendEmailService(IEmailService):
             html_content=html_content,
             text_content=text_content,
         )
-        self.logger.debug(f"Password reset email sent to {email}.")
-        return reset_email
+        if reset_email:
+            self.logger.debug(f"Password reset email sent to {email}.")
+            return reset_email
+        return None

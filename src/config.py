@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     CACHE_GUEST_PROFILES_TIME_IN_SECONDS: int = 60 * 60 * 24 * 7  # 1 week
 
     # Email
-    RESEND_API_KEY: str
-    RESEND_FROM_EMAIL: str
+    RESEND_API_KEY: str | None = None
+    RESEND_FROM_EMAIL: str | None = None
     RESEND_TO_EMAIL: str | None = None
     EMAIL_VERIFICATION_EXPIRES_IN_HOURS: int = 24
 
