@@ -3,6 +3,7 @@ from typing import Optional
 
 from ..domain.models import User
 from ..dtos import PublishingOptionsUpdate, UpdateProfile
+from ..dtos.profile import CreateProfile
 
 
 class IProfileService(ABC):
@@ -13,15 +14,14 @@ class IProfileService(ABC):
         pass
 
     @abstractmethod
-    async def create_profile_for_user_from_remote_data(
-        self, username: str, user: User
+    async def create_profile(
+        self,
+        username: str,
+        user: User | None,
+        turnstile_data: CreateProfile,
+        remote_ip: str | None,
     ) -> dict:
-        """Create a new profile connected to a user entity"""
-        pass
-
-    @abstractmethod
-    async def create_guest_profile_from_remote_data(self, username: str) -> dict:
-        """Create a new guest profile from remote data"""
+        """Create a new profile"""
         pass
 
     @abstractmethod

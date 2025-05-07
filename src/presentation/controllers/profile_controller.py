@@ -2,16 +2,12 @@ from fastapi import APIRouter, Request, status
 
 from src.core.dtos import CreateProfile, PublishingOptionsUpdate, UpdateProfile
 from src.core.exceptions import (
-    HTTPException,
-    HTTPExceptionType,
     handle_exceptions,
 )
 from src.deps import (
-    AuthServiceDep,
     CurrentUserDep,
     OptionalCurrentUserDep,
     ProfileServiceDep,
-    limiter,
 )
 
 profile_controller_v1 = APIRouter(prefix="/v1/profile", tags=["profile"])
@@ -61,14 +57,13 @@ async def get_profile(
 
 
 @profile_controller_v1.post("/{username}")
-@limiter.limit("3/minute; 10/day")
+# @limiter.limit("3/minute; 10/day")
 @handle_exceptions()
 async def create_profile(
     request: Request,
     username: str,
     turnstile_data: CreateProfile,
     profile_service: ProfileServiceDep,
-    auth_service: AuthServiceDep,
     user: OptionalCurrentUserDep,
 ):
     """
@@ -84,23 +79,9 @@ async def create_profile(
         The created profile
     """
     remote_ip = request.client.host if request.client else None
-    username = profile_service.extract_username(username)
-
-    is_authenticated = user is not None
-
-    if is_authenticated:
-        return await profile_service.create_profile_for_user_from_remote_data(
-            username, user
-        )
-
-    elif await auth_service.verify_turnstile(turnstile_data.turnstileToken, remote_ip):
-        return await profile_service.create_guest_profile_from_remote_data(username)
-
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=HTTPExceptionType.BadRequest.value,
-        )
+    return await profile_service.create_profile(
+        username, user, turnstile_data, remote_ip
+    )
 
 
 @profile_controller_v1.patch("/{username}")

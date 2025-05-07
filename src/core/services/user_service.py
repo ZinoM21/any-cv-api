@@ -137,14 +137,7 @@ class UserService(IUserService):
         await self.profile_service.delete_profiles_from_user(user)
 
         # Delete the user
-        delete_success = self.user_repository.delete(user)
-        if not delete_success:
-            # self.logger.error(f"Failed to delete user: {user_id}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=HTTPExceptionType.InternalServerError.value,
-            )
-
+        self.user_repository.delete(user)
         self.logger.debug(f"User account deleted successfully: {user.email}")
 
         return None

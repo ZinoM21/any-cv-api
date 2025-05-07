@@ -1,15 +1,21 @@
 from mongoengine import connect, disconnect
+from pymongo import MongoClient
 
-from src.config import settings
 from src.core.interfaces import ILogger
 
 
 class Database:
     @classmethod
-    def connect(cls, logger: ILogger):
+    def connect(cls, mongodb_url: str, logger: ILogger):
         """Initialize database connection and Beanie"""
         try:
-            connect("anycv", host=settings.MONGODB_URL, uuidRepresentation="standard")
+            connect(
+                "anycv",
+                host=mongodb_url,
+                uuidRepresentation="standard",
+                mongo_client_class=MongoClient,
+                alias="default",
+            )
             logger.info("Successfully connected to MongoDB with MongoEngine")
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {str(e)}")

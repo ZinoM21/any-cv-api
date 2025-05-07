@@ -10,17 +10,21 @@ class Settings(BaseSettings):
     MONGODB_URL: str
 
     # External Services
+    EXTERNAL_MAX_RETRIES: int = 4
+    EXTERNAL_RETRY_DELAY_SECONDS: int = 1
     RAPIDAPI_URL: str
     RAPIDAPI_HOST: str
     RAPIDAPI_KEY: str
-    EXTERNAL_MAX_RETRIES: int = 4
-    EXTERNAL_RETRY_DELAY_SECONDS: int = 1
     LINKEDIN_MEDIA_DOMAINS: Set[str] = {
         "media.licdn.com",
         "media-exp1.licdn.com",
         "media-exp2.licdn.com",
         "media-exp3.licdn.com",
     }
+    TURNSTILE_SECRET_KEY: str
+    TURNSTILE_CHALLENGE_URL: str = (
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+    )
 
     # File Storage
     SUPABASE_URL: str
@@ -47,15 +51,8 @@ class Settings(BaseSettings):
 
     # Auth
     AUTH_SECRET: str
-    TURNSTILE_SECRET_KEY: str
-    TURNSTILE_CHALLENGE_URL: str = (
-        "https://challenges.cloudflare.com/turnstile/v0/siteverify"
-    )
     ACCESS_TOKEN_EXPIRES_IN_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRES_IN_MINUTES: int = 60 * 24 * 14  # 2 weeks
     AUTH_ALGORITHM: str = "HS256"
 
     model_config = SettingsConfigDict(env_file=".env")
-
-
-settings = Settings()  # type: ignore

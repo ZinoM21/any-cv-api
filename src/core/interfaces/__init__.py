@@ -3,8 +3,9 @@ from .data_transformer_service_interface import IDataTransformerService
 from .email_service_interface import IEmailService
 from .file_service_interface import IFileService
 from .logger_interface import ILogger
+from .profile_data_provider_interface import IProfileDataProvider
 from .profile_service_interface import IProfileService
-from .remote_data_source_interface import IRemoteDataSource
+from .turnstile_verifier_interface import ITurnstileVerifier
 from .user_service_interface import IUserService
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "IFileService",
     "IProfileService",
     "IUserService",
-    "IRemoteDataSource",
+    "IProfileDataProvider",
+    "ITurnstileVerifier",
 ]

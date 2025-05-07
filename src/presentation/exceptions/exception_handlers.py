@@ -17,7 +17,6 @@ from slowapi.errors import RateLimitExceeded
 from src.core.exceptions import (
     HTTPException,
     HTTPExceptionType,
-    HTTPExceptionWithOrigin,
     RequestValidationException,
     UncaughtException,
 )
@@ -34,21 +33,7 @@ def add_exception_handlers(app: FastAPI, logger: ILogger) -> None:
     async def custom_http_exception_handler(
         request: Request, exc: HTTPException, logger=logger
     ):
-        logger.error(f"HTTPException: {exc}")
-        return await http_exception_handler(
-            request,
-            FastAPIHTTPException(
-                status_code=exc.status_code,
-                detail=exc.detail,
-                headers=exc.headers,
-            ),
-        )
-
-    @app.exception_handler(HTTPExceptionWithOrigin)
-    async def custom_http_exception_with_origin_handler(
-        request: Request, exc: HTTPExceptionWithOrigin, logger=logger
-    ):
-        logger.error(f"HTTPException in {exc.origin}: {exc.detail}")
+        logger.error(f"HTTPException{f' in {exc.origin}' if exc.origin else ''}: {exc}")
         return await http_exception_handler(
             request,
             FastAPIHTTPException(

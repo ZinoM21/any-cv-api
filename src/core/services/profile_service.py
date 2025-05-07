@@ -4,29 +4,32 @@ from typing import Optional
 from fastapi import status
 
 from src.config import Settings
-from src.core.domain.interfaces import (
-    IProfileCacheRepository,
-    IProfileRepository,
-    IUserRepository,
-)
-from src.core.domain.models import (
-    GuestProfile,
-    Profile,
-    User,
-)
-from src.core.dtos import PublishingOptionsUpdate, UpdateProfile
-from src.core.exceptions import (
-    HTTPException,
-    HTTPExceptionType,
-    RequestValidationException,
-    handle_exceptions,
-)
 from src.core.interfaces import (
     IDataTransformerService,
     IFileService,
     ILogger,
+    IProfileDataProvider,
     IProfileService,
-    IRemoteDataSource,
+    ITurnstileVerifier,
+)
+
+from ..domain.interfaces import (
+    IProfileCacheRepository,
+    IProfileRepository,
+    IUserRepository,
+)
+from ..domain.models import (
+    GuestProfile,
+    Profile,
+    User,
+)
+from ..dtos import PublishingOptionsUpdate, UpdateProfile
+from ..dtos.profile import CreateProfile
+from ..exceptions import (
+    HTTPException,
+    HTTPExceptionType,
+    RequestValidationException,
+    handle_exceptions,
 )
 
 
@@ -36,18 +39,20 @@ class ProfileService(IProfileService):
         profile_repository: IProfileRepository,
         profile_cache_repository: IProfileCacheRepository,
         user_repository: IUserRepository,
-        remote_data_source: IRemoteDataSource,
+        profile_data_provider: IProfileDataProvider,
         file_service: IFileService,
         data_transformer: IDataTransformerService,
+        turnstile_verifier: ITurnstileVerifier,
         logger: ILogger,
         settings: Settings,
     ):
         self.profile_repository = profile_repository
         self.profile_cache_repository = profile_cache_repository
         self.user_repository = user_repository
-        self.remote_data_source = remote_data_source
+        self.profile_data_provider = profile_data_provider
         self.file_service = file_service
         self.data_transformer = data_transformer
+        self.turnstile_verifier = turnstile_verifier
         self.logger = logger
         self.settings = settings
 
@@ -82,8 +87,8 @@ class ProfileService(IProfileService):
         user_id: Optional[str] = None,
     ) -> Profile:
         """Fetch and transform profile data from remote data source"""
-        raw_profile_data = await self.remote_data_source.get_profile_data_by_username(
-            username
+        raw_profile_data = (
+            await self.profile_data_provider.get_profile_data_by_username(username)
         )
         if not raw_profile_data:
             raise HTTPException(
@@ -216,7 +221,7 @@ class ProfileService(IProfileService):
         return new_paths
 
     @handle_exceptions()
-    async def create_profile_for_user_from_remote_data(
+    async def _create_profile_for_user_from_remote_data(
         self, username: str, user: User
     ) -> dict:
         """Handle profile retrieval/creation for authenticated users"""
@@ -241,6 +246,7 @@ class ProfileService(IProfileService):
         profile = self.profile_repository.create(profile)
 
         # Link the profile to the user
+        self.logger.debug(f"Appending profile {profile.username} to user: {user.id}")
         self.user_repository.append_profile_to_user(profile, user)
         self.logger.debug(f"Profile record created and linked to user for: {username}")
 
@@ -254,7 +260,7 @@ class ProfileService(IProfileService):
         return profile.to_mongo().to_dict()
 
     @handle_exceptions()
-    async def create_guest_profile_from_remote_data(self, username: str) -> dict:
+    async def _create_guest_profile_from_remote_data(self, username: str) -> dict:
         """Handle profile retrieval/creation for guest users"""
         # Check cache / db first
         cached_profile = self.profile_cache_repository.find_by_username(username)
@@ -291,6 +297,34 @@ class ProfileService(IProfileService):
         self.logger.debug(f"Guest profile record created for: {username}")
 
         return guest_profile.to_mongo().to_dict()
+
+    @handle_exceptions()
+    async def create_profile(
+        self,
+        username: str,
+        user: User | None,
+        turnstile_data: CreateProfile,
+        remote_ip: str | None,
+    ) -> dict:
+        """Create a new profile"""
+
+        username = self.extract_username(username)
+
+        is_authenticated = user is not None
+
+        if is_authenticated:
+            return await self._create_profile_for_user_from_remote_data(username, user)
+
+        elif await self.turnstile_verifier.verify_token(
+            turnstile_data.turnstileToken, remote_ip
+        ):
+            return await self._create_guest_profile_from_remote_data(username)
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=HTTPExceptionType.BadRequest.value,
+            )
 
     @handle_exceptions()
     async def get_profile(self, username: str, user: Optional[User] = None) -> dict:
@@ -636,6 +670,7 @@ class ProfileService(IProfileService):
             )
 
         # Link profile to user
+        self.logger.debug(f"Appending profile {profile.username} to user: {user.id}")
         self.user_repository.append_profile_to_user(profile, user)
         self.logger.debug(f"Profile linked to user for username: {username}")
 

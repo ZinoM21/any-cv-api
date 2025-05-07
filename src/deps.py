@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from src.config import Settings, settings
+from src.config import Settings
 from src.core.domain.interfaces import (
     IProfileCacheRepository,
     IProfileRepository,
@@ -21,8 +21,9 @@ from src.core.interfaces import (
     IEmailService,
     IFileService,
     ILogger,
+    IProfileDataProvider,
     IProfileService,
-    IRemoteDataSource,
+    ITurnstileVerifier,
     IUserService,
 )
 from src.core.services import (
@@ -34,7 +35,10 @@ from src.core.services import (
     UserService,
 )
 from src.core.utils import decode_jwt
-from src.infrastructure.external import LinkedInAPI
+from src.infrastructure.external import (
+    CloudflareTurnstileVerifier,
+    RapidAPIProfileDataProvider,
+)
 from src.infrastructure.logging import UvicornLogger
 from src.infrastructure.persistence import (
     Database,
@@ -47,7 +51,7 @@ from src.infrastructure.persistence import (
 # Config
 @lru_cache
 def get_settings():
-    return settings
+    return Settings()  # type: ignore
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -82,12 +86,31 @@ def get_db():
 DatabaseDep = Annotated[Database, Depends(get_db)]
 
 
+# Cloudflare Secret Key - define as fastAPI dependency here to mock in tests
+def get_cf_secret(settings: SettingsDep):
+    return settings.TURNSTILE_SECRET_KEY
+
+
+CFSecretDep = Annotated[str, Depends(get_cf_secret)]
+
+
 # External
-def get_linkedin_api(logger: LoggerDep, settings: SettingsDep) -> IRemoteDataSource:
-    return LinkedInAPI(logger, settings)
+def get_profile_data_provider(
+    logger: LoggerDep, settings: SettingsDep
+) -> IProfileDataProvider:
+    return RapidAPIProfileDataProvider(logger, settings)
 
 
-RemoteDataSourceDep = Annotated[IRemoteDataSource, Depends(get_linkedin_api)]
+def get_turnstile_verifier(
+    logger: LoggerDep, settings: SettingsDep, cfSecret: CFSecretDep
+) -> ITurnstileVerifier:
+    return CloudflareTurnstileVerifier(logger, settings, cfSecret)
+
+
+ProfileDataProviderDep = Annotated[
+    IProfileDataProvider, Depends(get_profile_data_provider)
+]
+TurnstileVerifierDep = Annotated[ITurnstileVerifier, Depends(get_turnstile_verifier)]
 
 
 # Email
@@ -115,8 +138,8 @@ ProfileCacheRepositoryDep = Annotated[
 ]
 
 
-def get_user_repository(logger: LoggerDep) -> IUserRepository:
-    return UserRepository(logger)
+def get_user_repository() -> IUserRepository:
+    return UserRepository()
 
 
 UserRepositoryDep = Annotated[IUserRepository, Depends(get_user_repository)]
@@ -153,9 +176,10 @@ def get_profile_service(
     profile_repository: ProfileRepositoryDep,
     profile_cache_repository: ProfileCacheRepositoryDep,
     user_repository: UserRepositoryDep,
-    remote_data_source: RemoteDataSourceDep,
+    profile_data_provider: ProfileDataProviderDep,
     file_service: FileServiceDep,
     data_transformer: DataTransformerServiceDep,
+    turnstile_verifier: TurnstileVerifierDep,
     logger: LoggerDep,
     settings: SettingsDep,
 ) -> IProfileService:
@@ -163,9 +187,10 @@ def get_profile_service(
         profile_repository,
         profile_cache_repository,
         user_repository,
-        remote_data_source,
+        profile_data_provider,
         file_service,
         data_transformer,
+        turnstile_verifier,
         logger,
         settings,
     )
@@ -191,10 +216,18 @@ def get_auth_service(
     user_repository: UserRepositoryDep,
     crypto_context: CryptoContextDep,
     email_service: EmailServiceDep,
+    turnstile_verifier: TurnstileVerifierDep,
     logger: LoggerDep,
     settings: SettingsDep,
 ) -> IAuthService:
-    return AuthService(user_repository, crypto_context, email_service, logger, settings)
+    return AuthService(
+        user_repository,
+        crypto_context,
+        email_service,
+        turnstile_verifier,
+        logger,
+        settings,
+    )
 
 
 AuthServiceDep = Annotated[IAuthService, Depends(get_auth_service)]
@@ -207,6 +240,7 @@ security = HTTPBearer(auto_error=False)
 async def get_current_user(
     bearer_header: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
     user_repo: UserRepositoryDep,
+    settings: SettingsDep,
 ) -> User:
     if not bearer_header:
         raise UnauthorizedHTTPException(detail=HTTPExceptionType.InvalidToken.value)
@@ -241,6 +275,7 @@ async def get_optional_current_user(
         HTTPAuthorizationCredentials | None, Depends(optional_auth_scheme)
     ],
     user_repository: UserRepositoryDep,
+    settings: SettingsDep,
 ) -> Optional[User]:
     """
     Dependency that retrieves the authenticated user if available,

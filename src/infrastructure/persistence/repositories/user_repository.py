@@ -7,12 +7,11 @@ from pydantic import EmailStr
 from src.core.domain.interfaces import IUserRepository
 from src.core.domain.models import Profile, User
 from src.core.exceptions import handle_exceptions
-from src.core.interfaces import ILogger
 
 
 class UserRepository(IUserRepository):
-    def __init__(self, logger: ILogger):
-        self.logger = logger
+    def __init__(self):
+        pass
 
     @handle_exceptions()
     def find_by_email(self, email: EmailStr) -> Optional[User]:
@@ -60,15 +59,8 @@ class UserRepository(IUserRepository):
 
     @handle_exceptions()
     def append_profile_to_user(self, profile: Profile, user: User) -> User:
-        try:
-            self.logger.debug(
-                f"Appending profile {profile.username} to user: {user.id}"
-            )
-            User.objects(id=user.id).update_one(push__profiles=profile)  # type: ignore
-            return user.save()
-        except Exception as e:
-            self.logger.error(f"Error appending profile to user: {e}")
-            raise e
+        User.objects(id=user.id).update_one(push__profiles=profile)  # type: ignore
+        return user.save()
 
     @handle_exceptions()
     def delete(self, user: User) -> bool:
@@ -78,11 +70,7 @@ class UserRepository(IUserRepository):
             user: The user to delete
 
         Returns:
-            bool: True if deletion was successful, False otherwise
+            bool: True if deletion was successful, raises an exception otherwise
         """
-        try:
-            user.delete()
-            return True
-        except Exception as e:
-            self.logger.error(f"Error deleting user and profiles: {e}")
-            return False
+        user.delete()
+        return True

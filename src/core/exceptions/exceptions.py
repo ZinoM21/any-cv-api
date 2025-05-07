@@ -33,17 +33,26 @@ class RequestValidationException(Exception):
 
 
 class HTTPException(Exception):
-    """Exception for HTTP exceptions"""
+    """Exception for HTTP exceptions
+
+    Args:
+        status_code: The HTTP status code
+        detail: The detail of the exception
+        headers: The headers of the exception
+        origin: The origin of the exception, i.e. service_name.function_name. Will override the decorator-inferred origin.
+    """
 
     def __init__(
         self,
         status_code: int,
         detail: str | None = None,
         headers: Optional[Dict[str, str]] = None,
+        origin: str | None = None,
     ) -> None:
         self.status_code = status_code
         self.detail = detail
         self.headers = headers
+        self.origin = origin
 
 
 class UnauthorizedHTTPException(HTTPException):
@@ -55,16 +64,3 @@ class UnauthorizedHTTPException(HTTPException):
         headers: Optional[Dict[str, str]] = None,
     ) -> None:
         super().__init__(status_code=401, detail=detail, headers=headers)
-
-
-class HTTPExceptionWithOrigin(HTTPException):
-    """Exception for HTTP exceptions with an origin"""
-
-    def __init__(
-        self, status_code: int, origin: str, detail: str | None = None
-    ) -> None:
-        super().__init__(
-            status_code=status_code,
-            detail=detail,
-        )
-        self.origin = origin

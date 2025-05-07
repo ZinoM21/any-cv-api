@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
-import requests
 from fastapi import status
 from passlib.context import CryptContext
 
@@ -26,11 +25,15 @@ from src.core.dtos import (
 from src.core.exceptions import (
     HTTPException,
     HTTPExceptionType,
-    RequestValidationException,
     UnauthorizedHTTPException,
     handle_exceptions,
 )
-from src.core.interfaces import IAuthService, IEmailService, ILogger
+from src.core.interfaces import (
+    IAuthService,
+    IEmailService,
+    ILogger,
+    ITurnstileVerifier,
+)
 from src.core.utils import decode_jwt, encode_with_expiry
 
 
@@ -40,12 +43,14 @@ class AuthService(IAuthService):
         user_repository: IUserRepository,
         crypto_context: CryptContext,
         email_service: IEmailService,
+        turnstile_verifier: ITurnstileVerifier,
         logger: ILogger,
         settings: Settings,
     ):
         self.user_repository = user_repository
         self.crypto_context = crypto_context
         self.email_service = email_service
+        self.turnstile_verifier = turnstile_verifier
         self.logger = logger
         self.settings = settings
 
@@ -188,70 +193,6 @@ class AuthService(IAuthService):
 
         new_access_token = self._create_tokens(user, "refresh")
         return AccessResponse(**new_access_token)
-
-    @handle_exceptions(origin="AuthService.verify_turnstile")
-    async def verify_turnstile(
-        self, token: str | None, remote_ip: str | None = None
-    ) -> bool:
-        """
-        Verify a Turnstile token againt an external service
-
-        Args:
-            token: The token to verify
-            remote_ip: Optional IP address of the user
-
-        Returns:
-            bool: True if verification was successful
-
-        Raises:
-            HTTPException: If verification fails
-        """
-        if not token:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=HTTPExceptionType.BadRequest.value,
-            )
-
-        data = {
-            "secret": self.settings.TURNSTILE_SECRET_KEY,
-            "response": token,
-        }
-
-        if remote_ip:
-            data["remoteip"] = remote_ip
-
-        response = requests.post(self.settings.TURNSTILE_CHALLENGE_URL, json=data)
-
-        verify_response = response.json()
-        if not verify_response.get("success"):
-            error_codes = verify_response.get("error-codes") or []
-            self.logger.error(f"Turnstile verification failed: {error_codes}")
-            if "missing-input-response" in error_codes or "bad-request" in error_codes:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=HTTPExceptionType.BadRequest.value,
-                )
-            elif (
-                "invalid-input-response" in error_codes
-                or "timeout-or-duplicate" in error_codes
-            ):
-                raise RequestValidationException(
-                    message="Turnstile token is invalid",
-                    parameter="turnstileToken",
-                )
-            elif "internal-error" in error_codes:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=HTTPExceptionType.ServiceUnavailable.value,
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=HTTPExceptionType.InternalServerError.value,
-                )
-
-        self.logger.debug("Request validated against Turnstile")
-        return True
 
     @handle_exceptions(origin="AuthService.verify_email")
     async def verify_email(self, token: str) -> bool:
