@@ -15,7 +15,7 @@ from mongoengine import (
 
 class Position(EmbeddedDocument):
     title = StringField(max_length=255, required=True)
-    startDate = DateTimeField(required=True)
+    startDate = DateTimeField()
     endDate = DateTimeField()
     duration = StringField(max_length=255)
     description = StringField()
@@ -36,7 +36,7 @@ class Education(EmbeddedDocument):
     schoolPictureUrl = StringField(max_length=255)
     degree = StringField(max_length=255, required=True)
     fieldOfStudy = StringField(max_length=255)
-    startDate = DateTimeField(required=True)
+    startDate = DateTimeField()
     endDate = DateTimeField()
     grade = StringField(max_length=255)
     activities = StringField()
@@ -48,7 +48,7 @@ class VolunteeringExperience(EmbeddedDocument):
     organization = StringField(required=True)
     organizationProfileUrl = StringField(max_length=255)
     organizationLogoUrl = StringField(max_length=255)
-    startDate = DateTimeField(required=True)
+    startDate = DateTimeField()
     endDate = DateTimeField()
     cause = StringField(max_length=255)
     description = StringField()
@@ -56,7 +56,7 @@ class VolunteeringExperience(EmbeddedDocument):
 
 class Project(EmbeddedDocument):
     title = StringField(max_length=255, required=True)
-    startDate = DateTimeField(required=True)
+    startDate = DateTimeField()
     endDate = DateTimeField()
     description = StringField()
     url = StringField(max_length=255)

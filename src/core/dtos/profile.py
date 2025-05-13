@@ -12,7 +12,7 @@ Str2600 = Annotated[str, StringConstraints(max_length=2600)]
 
 class PositionUpdate(BaseModel):
     title: Str255
-    startDate: datetime
+    startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
     duration: Optional[Str255] = None
     description: Optional[str] = None
@@ -33,7 +33,7 @@ class EducationUpdate(BaseModel):
     schoolPictureUrl: Optional[Str255] = None
     degree: Str255
     fieldOfStudy: Optional[Str255] = None
-    startDate: datetime
+    startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
     grade: Optional[Str255] = None
     activities: Optional[str] = None
@@ -45,7 +45,7 @@ class VolunteeringExperienceUpdate(BaseModel):
     organization: Str255
     organizationProfileUrl: Optional[Str255] = None
     organizationLogoUrl: Optional[Str255] = None
-    startDate: datetime
+    startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
     cause: Optional[Str255] = None
     description: Optional[str] = None
@@ -53,7 +53,7 @@ class VolunteeringExperienceUpdate(BaseModel):
 
 class ProjectUpdate(BaseModel):
     title: Str255
-    startDate: datetime
+    startDate: Optional[datetime] = None
     endDate: Optional[datetime] = None
     description: Optional[str] = None
     url: Optional[Str255] = None

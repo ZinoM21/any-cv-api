@@ -73,7 +73,7 @@ class DataTransformerService(IDataTransformerService):
         try:
             date_parts = caption.split(" · ")
             dates = date_parts[0].split(" - ")
-            start_date_str = dates[0].strip()
+            start_date_str = dates[0].strip() if len(dates) > 0 else None
             end_date_str = dates[1].strip() if len(dates) > 1 else None
 
             # Use dateutil's parser which handles various date formats
